@@ -31,9 +31,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppTheme
+import dev.hackathon.linkopener.ui.strings.Strings
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    strings: Strings,
+) {
     val settings by viewModel.settings.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -45,31 +49,31 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             Text(
-                text = "Settings",
+                text = strings.settingsTitle,
                 style = MaterialTheme.typography.headlineSmall,
             )
 
-            SettingsSection(title = "Appearance") {
+            SettingsSection(title = strings.sectionAppearance) {
                 EnumDropdown(
-                    label = "Theme",
+                    label = strings.themeLabel,
                     value = settings.theme,
                     options = AppTheme.entries,
-                    optionLabel = ::themeLabel,
+                    optionLabel = strings::label,
                     onSelected = viewModel::onThemeSelected,
                 )
             }
 
-            SettingsSection(title = "Language") {
+            SettingsSection(title = strings.sectionLanguage) {
                 EnumDropdown(
-                    label = "Interface language",
+                    label = strings.languageLabel,
                     value = settings.language,
                     options = AppLanguage.entries,
-                    optionLabel = ::languageLabel,
+                    optionLabel = strings::label,
                     onSelected = viewModel::onLanguageSelected,
                 )
             }
 
-            SettingsSection(title = "System") {
+            SettingsSection(title = strings.sectionSystem) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -77,11 +81,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Start at login",
+                            text = strings.startAtLogin,
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         Text(
-                            text = "Launch the app automatically when you sign in.",
+                            text = strings.startAtLoginDescription,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -93,20 +97,20 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 }
             }
 
-            SettingsSection(title = "Browser exclusions") {
+            SettingsSection(title = strings.sectionBrowserExclusions) {
                 // TODO: integrate with stage 2 BrowserRepository.
                 // Until the browser-discovery stage lands, the storage layer
                 // already supports excludedBrowserIds (Set<BrowserId>) — we
                 // just don't have a real list of browsers to render here yet.
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Available once browser discovery ships (stage 2).",
+                        text = strings.exclusionsPlaceholder,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (settings.excludedBrowserIds.isNotEmpty()) {
                         Text(
-                            text = "Currently excluded ids: " +
+                            text = strings.exclusionsCurrentPrefix +
                                 settings.excludedBrowserIds.joinToString { it.value },
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -180,16 +184,4 @@ private fun <T> EnumDropdown(
             }
         }
     }
-}
-
-private fun themeLabel(theme: AppTheme): String = when (theme) {
-    AppTheme.System -> "System"
-    AppTheme.Light -> "Light"
-    AppTheme.Dark -> "Dark"
-}
-
-private fun languageLabel(language: AppLanguage): String = when (language) {
-    AppLanguage.System -> "System"
-    AppLanguage.En -> "English"
-    AppLanguage.Ru -> "Русский"
 }

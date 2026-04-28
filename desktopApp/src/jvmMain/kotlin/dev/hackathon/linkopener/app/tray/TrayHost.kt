@@ -14,8 +14,10 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
+import dev.hackathon.linkopener.ui.strings.resolveStrings
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
 import java.awt.MouseInfo
+import java.util.Locale
 
 @Composable
 fun ApplicationScope.TrayHost(
@@ -26,14 +28,24 @@ fun ApplicationScope.TrayHost(
     val settingsViewModel = remember(container) { container.newSettingsViewModel() }
     val settings by settingsViewModel.settings.collectAsState()
 
+    // Captured once at startup. Locale.getDefault() reads the JVM's locale
+    // which on macOS reflects the system "Region & Language" preference at
+    // the time the app launched. Changing OS locale will require restart —
+    // acceptable for the prototype.
+    val systemLanguageTag = remember { Locale.getDefault().language }
+
+    val strings = remember(settings.language, systemLanguageTag) {
+        resolveStrings(settings.language, systemLanguageTag)
+    }
+
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
     Tray(
         icon = remember { PlaceholderTrayIcon() },
         tooltip = appInfo.name,
         menu = {
-            Item("Settings", onClick = { settingsAnchor = currentCursorPosition() })
-            Item("Quit", onClick = onExit)
+            Item(strings.trayMenuSettings, onClick = { settingsAnchor = currentCursorPosition() })
+            Item(strings.trayMenuQuit, onClick = onExit)
         },
     )
 
@@ -46,12 +58,12 @@ fun ApplicationScope.TrayHost(
         )
         Window(
             onCloseRequest = { settingsAnchor = null },
-            title = "${appInfo.name} — Settings",
+            title = appInfo.name + strings.trayWindowSettingsSuffix,
             state = windowState,
             alwaysOnTop = true,
         ) {
             LinkOpenerTheme(theme = settings.theme) {
-                SettingsScreen(viewModel = settingsViewModel)
+                SettingsScreen(viewModel = settingsViewModel, strings = strings)
             }
         }
     }
