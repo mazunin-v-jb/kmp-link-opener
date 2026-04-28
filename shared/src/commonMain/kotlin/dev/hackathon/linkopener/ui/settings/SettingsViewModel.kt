@@ -45,6 +45,12 @@ class SettingsViewModel(
     init {
         refreshBrowsers()
         recheckDefaultBrowser()
+        // TODO: react to default-browser changes that happen while the app is
+        //  running — the macOS LaunchServices binding lives in a system plist
+        //  with no JDK notification API, so options are file-watching the plist
+        //  in MacOsDefaultBrowserService (Flow<Boolean> through the service
+        //  interface) or hooking window-focus in SettingsScreen. Picking one is
+        //  parked until the stage 4.x team settles on a refresh model.
     }
 
     fun onThemeSelected(theme: AppTheme) {

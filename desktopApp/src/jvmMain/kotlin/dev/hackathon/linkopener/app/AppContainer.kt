@@ -43,11 +43,17 @@ class AppContainer {
 
     private val settingsStore: Settings = Settings()
 
+    // Must match nativeDistributions.macOS.bundleID in desktopApp/build.gradle.kts.
+    // Used both to exclude ourselves from the discovered-browsers list (so picking
+    // "Link Opener" as the handler can't loop URLs back into our OpenURIHandler)
+    // and to recognise ourselves when reading the system's default-browser binding.
+    private val ownBundleId = "dev.hackathon.linkopener"
+
     private val autoStartManager: AutoStartManager = PlatformFactory.createAutoStartManager()
     private val browserDiscovery: BrowserDiscovery = PlatformFactory.createBrowserDiscovery()
     val urlReceiver: UrlReceiver = PlatformFactory.createUrlReceiver()
     private val defaultBrowserService: DefaultBrowserService =
-        PlatformFactory.createDefaultBrowserService()
+        PlatformFactory.createDefaultBrowserService(ownBundleId = ownBundleId)
     private val linkLauncher: LinkLauncher = PlatformFactory.createLinkLauncher()
 
     private val appInfoRepository: AppInfoRepository = AppInfoRepositoryImpl()
@@ -65,12 +71,6 @@ class AppContainer {
     val setAutoStartUseCase: SetAutoStartUseCase = SetAutoStartUseCase(settingsRepository)
     val setBrowserExcludedUseCase: SetBrowserExcludedUseCase =
         SetBrowserExcludedUseCase(settingsRepository)
-
-    // Must match nativeDistributions.macOS.bundleID in desktopApp/build.gradle.kts.
-    // Used to exclude ourselves from the discovered-browsers list — otherwise
-    // picking "Link Opener" as the handler would loop URLs back into our own
-    // OpenURIHandler.
-    private val ownBundleId = "dev.hackathon.linkopener"
 
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
         DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)

@@ -3,18 +3,40 @@ package dev.hackathon.linkopener.platform.macos
 import dev.hackathon.linkopener.platform.DefaultBrowserService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.nio.file.Path
+import kotlin.io.path.Path
+import kotlin.io.path.exists
 
 class MacOsDefaultBrowserService(
+    private val ownBundleId: String,
     private val osVersion: String = System.getProperty("os.version").orEmpty(),
+    private val launchServicesPlist: Path = defaultLaunchServicesPlist(),
+    private val plutilRunner: PlutilRunner = PlutilRunner(),
+    private val json: Json = Json { ignoreUnknownKeys = true },
 ) : DefaultBrowserService {
 
     override val canOpenSystemSettings: Boolean = true
 
-    // TODO: real Launch Services check (LSCopyDefaultHandlerForURLScheme via
-    //  JNA) lands when the app actually registers itself as a browser
-    //  candidate (stage 3). Until then this app cannot be the default,
-    //  so a hardcoded false matches reality.
-    override suspend fun isDefaultBrowser(): Boolean = false
+    override suspend fun isDefaultBrowser(): Boolean = withContext(Dispatchers.IO) {
+        if (!launchServicesPlist.exists()) return@withContext false
+        val jsonText = plutilRunner.toJson(launchServicesPlist) ?: return@withContext false
+        val handlers = runCatching {
+            json.parseToJsonElement(jsonText).jsonObject["LSHandlers"] as? JsonArray
+        }.getOrNull() ?: return@withContext false
+
+        handlers.any { entry ->
+            val obj = entry as? JsonObject ?: return@any false
+            val scheme = obj["LSHandlerURLScheme"]?.jsonPrimitive?.contentOrNull
+            val role = obj["LSHandlerRoleAll"]?.jsonPrimitive?.contentOrNull
+            (scheme == "http" || scheme == "https") && role == ownBundleId
+        }
+    }
 
     override suspend fun openSystemSettings(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
@@ -35,16 +57,6 @@ class MacOsDefaultBrowserService(
         //  one redirects to Appearance, the Desktop-Settings one drops the
         //  user on Wallpaper / something unrelated.
         //
-        //  Things to try:
-        //   - probe `defaults read /System/Library/PreferencePanes/.../*.plist`
-        //     to enumerate available pane bundle IDs on the host
-        //   - try `com.apple.DesktopAndDock-Settings.extension` and other
-        //     plausible Settings extension IDs
-        //   - or shell out to `osascript -e 'tell app "System Settings" to
-        //     reveal pane id "..."'` for a more structured way to navigate
-        //   - last resort: open System Settings root and rely on the
-        //     in-app instruction text to guide the user
-        //
         //  For now we keep the version-aware fallback so the button at least
         //  opens *some* settings pane on each macOS generation, even if it's
         //  not the exact destination.
@@ -53,5 +65,15 @@ class MacOsDefaultBrowserService(
         } else {
             "x-apple.systempreferences:com.apple.preference.general"
         }
+    }
+
+    private companion object {
+        fun defaultLaunchServicesPlist(): Path = Path(
+            System.getProperty("user.home").orEmpty(),
+            "Library",
+            "Preferences",
+            "com.apple.LaunchServices",
+            "com.apple.launchservices.secure.plist",
+        )
     }
 }
