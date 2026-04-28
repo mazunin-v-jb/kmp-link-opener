@@ -31,17 +31,22 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -92,6 +97,7 @@ import kmp_link_opener.shared.generated.resources.manual_add_invalid_prefix
 import kmp_link_opener.shared.generated.resources.manual_add_self
 import kmp_link_opener.shared.generated.resources.move_down
 import kmp_link_opener.shared.generated.resources.move_up
+import kmp_link_opener.shared.generated.resources.nudge_already_running
 import kmp_link_opener.shared.generated.resources.remove_manual_browser
 import kmp_link_opener.shared.generated.resources.retry as retryStr
 import kmp_link_opener.shared.generated.resources.refresh_action
@@ -121,18 +127,29 @@ fun SettingsScreen(
     // desktopApp wires this to a native AWT FileDialog and forwards the
     // chosen path into `viewModel.onManualBrowserPicked(...)`.
     onAddBrowserClick: () -> Unit = {},
+    // Fires when a second copy of the app pinged us while Settings is open.
+    // Default: empty flow — keeps existing call sites and tests compiling.
+    nudges: SharedFlow<Unit> = remember { MutableSharedFlow() },
 ) {
     val settings by viewModel.settings.collectAsState()
     val browsers by viewModel.browsers.collectAsState()
     val isDefault by viewModel.isDefaultBrowser.collectAsState()
     val manualAddNotice by viewModel.manualAddNotice.collectAsState()
     var activeSection by remember { mutableStateOf(NavSection.DefaultBrowser) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val nudgeMessage = stringResource(Res.string.nudge_already_running)
+    LaunchedEffect(nudges, nudgeMessage) {
+        nudges.collect {
+            snackbarHostState.showSnackbar(message = nudgeMessage, withDismissAction = true)
+        }
+    }
 
     // Provide a locale nonce so children that don't take any settings-derived
     // parameter still recompose when the user switches language — without it
     // Compose's smart-skipping leaves TopAppBar / Sidebar / banner stuck on
     // the previous locale until something else invalidates them.
     CompositionLocalProvider(LocalAppLocale provides settings.language.name) {
+    Box(modifier = Modifier.fillMaxSize()) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -197,6 +214,13 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(16.dp),
+    )
     }
     }
 }

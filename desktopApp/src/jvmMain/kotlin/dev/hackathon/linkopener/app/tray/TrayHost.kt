@@ -1,6 +1,7 @@
 package dev.hackathon.linkopener.app.tray
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,8 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.MouseInfo
 import java.io.File
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.app_name
 import kmp_link_opener.shared.generated.resources.tray_menu_quit
@@ -67,6 +70,23 @@ private fun ApplicationScope.TrayHostBody(
     val pickerState by container.pickerCoordinator.state.collectAsState()
 
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
+
+    // Nudges flow into the open Settings window when a second copy of the app
+    // pings us while Settings is already visible. Owned here (not in
+    // AppContainer) because the dispatch decision — open vs nudge — depends
+    // on `settingsAnchor`, which is composition-local state.
+    val settingsNudges = remember {
+        MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    }
+    LaunchedEffect(container) {
+        container.activationRequests.collect {
+            if (settingsAnchor == null) {
+                settingsAnchor = currentCursorPosition()
+            } else {
+                settingsNudges.tryEmit(Unit)
+            }
+        }
+    }
 
     val appName = stringResource(Res.string.app_name)
 
@@ -132,6 +152,7 @@ private fun ApplicationScope.TrayHostBody(
                         val path = pickBrowserAppPath()
                         settingsViewModel.onManualBrowserPicked(path)
                     },
+                    nudges = settingsNudges,
                 )
             }
         }

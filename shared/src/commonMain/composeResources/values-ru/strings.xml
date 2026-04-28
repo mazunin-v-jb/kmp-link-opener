@@ -85,4 +85,7 @@
     <string name="picker_show_all">Показать все</string>
     <string name="picker_empty">Браузеры недоступны</string>
     <string name="picker_empty_hint">Откройте настройки, чтобы убрать исключения или установить браузер.</string>
+
+    <!-- Single-instance nudge -->
+    <string name="nudge_already_running">Я тут. Услышал тебя ещё в первый раз.</string>
 </resources>
