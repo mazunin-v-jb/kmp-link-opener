@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,10 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -37,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +62,7 @@ import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLow
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LocalIsDarkMode
+import kotlinx.coroutines.launch
 
 private enum class NavSection { Appearance, Language, System, Exclusions }
 
@@ -72,6 +76,8 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     var activeSection by remember { mutableStateOf(NavSection.Appearance) }
+    val lazyState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -88,9 +94,15 @@ fun SettingsScreen(
                     strings = strings,
                     appVersion = appVersion,
                     activeSection = activeSection,
-                    onSelect = { activeSection = it },
+                    onSelect = { section ->
+                        activeSection = section
+                        scope.launch {
+                            lazyState.animateScrollToItem(NavSection.entries.indexOf(section))
+                        }
+                    },
                 )
                 MainContent(
+                    lazyState = lazyState,
                     strings = strings,
                     settings = settings,
                     onThemeSelected = viewModel::onThemeSelected,
@@ -260,6 +272,7 @@ private fun NavItem(
 
 @Composable
 private fun MainContent(
+    lazyState: LazyListState,
     strings: Strings,
     settings: AppSettings,
     onThemeSelected: (AppTheme) -> Unit,
@@ -267,25 +280,47 @@ private fun MainContent(
     onAutoStartChanged: (Boolean) -> Unit,
     onExclusionToggled: (BrowserId, Boolean) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+    LazyColumn(
+        state = lazyState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 720.dp)
-                .wrapContentWidth(Alignment.CenterHorizontally),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        item(key = NavSection.Appearance) {
+            CenteredItem {
                 AppearanceSection(strings, settings.theme, onThemeSelected)
+            }
+        }
+        item(key = NavSection.Language) {
+            CenteredItem {
                 LanguageSection(strings, settings.language, onLanguageSelected)
+            }
+        }
+        item(key = NavSection.System) {
+            CenteredItem {
                 SystemSection(strings, settings.autoStartEnabled, onAutoStartChanged)
+            }
+        }
+        item(key = NavSection.Exclusions) {
+            CenteredItem {
                 ExclusionsSection(strings, settings.excludedBrowserIds, onExclusionToggled)
             }
         }
+    }
+}
+
+// Mirrors the centering+max-width pattern that wraps the section list. Each
+// LazyColumn item gets it independently so animateScrollToItem aligns the
+// section's first element with the top of the visible content area.
+@Composable
+private fun CenteredItem(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 720.dp)
+            .wrapContentWidth(Alignment.CenterHorizontally),
+    ) {
+        content()
     }
 }
 
