@@ -78,13 +78,16 @@ private fun ApplicationScope.TrayHostBody(
                 stringResource(Res.string.tray_menu_settings),
                 onClick = { settingsAnchor = currentCursorPosition() },
             )
-            // TODO: remove the dev-only "Test picker" entry before public
-            //  release. It's here so the picker can be exercised without
-            //  packaging + installing the app as the OS default browser.
-            Item(
-                stringResource(Res.string.tray_menu_test_picker),
-                onClick = { container.pickerCoordinator.handleIncomingUrl("https://example.com/?utm=picker-test") },
-            )
+            // Dev-only "Test picker" — only shown when -Dlinkopener.debug=true
+            // is on the JVM args (matches the same flag that gates the
+            // discovery dump in AppContainer). Stamped public builds get
+            // launched without the flag and never see this entry.
+            if (System.getProperty("linkopener.debug") == "true") {
+                Item(
+                    stringResource(Res.string.tray_menu_test_picker),
+                    onClick = { container.pickerCoordinator.handleIncomingUrl("https://example.com/?utm=picker-test") },
+                )
+            }
             Item(stringResource(Res.string.tray_menu_quit), onClick = onExit)
         },
     )

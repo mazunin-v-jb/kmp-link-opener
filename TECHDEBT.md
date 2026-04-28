@@ -54,16 +54,6 @@ Resolved items are removed (git log preserves history) — keep the list short s
 
 ---
 
-## TD-7 — Dev-only "Test picker" tray entry must be removed before release
-
-**Where:** `desktopApp/src/jvmMain/kotlin/dev/hackathon/linkopener/app/tray/TrayHost.kt:81` (TODO comment).
-
-**What:** A "Test picker (dev)" item in the tray menu spawns the picker with `https://example.com/?utm=picker-test` so we can exercise the picker chain without packaging the app and registering it as the default browser. It's there because debugging the picker via the actual default-browser flow requires `createDistributable` + reinstall + Launch Services round-trip per change.
-
-**Action:** remove the menu item before any public/packaged release. Optionally gate it behind `DEBUG_LOGGING` first (so internal builds keep it but stamped releases don't ship it) — the latter is a one-line guard.
-
----
-
 ## TD-8 — Refresh button can show stale default-browser state
 
 **Where:** `shared/src/jvmMain/kotlin/dev/hackathon/linkopener/platform/macos/MacOsDefaultBrowserService.kt` (`isDefaultBrowser`); the user-facing trigger is the Settings refresh button wired through `SettingsViewModel.refresh()`.
