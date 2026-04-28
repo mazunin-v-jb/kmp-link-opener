@@ -21,6 +21,8 @@ object PlatformFactory {
         HostOs.Other -> EmptyBrowserDiscovery(System.getProperty("os.name").orEmpty())
     }
 
+    fun createUrlReceiver(): UrlReceiver = JvmUrlReceiver()
+
     private fun detectHostOs(): HostOs {
         val name = System.getProperty("os.name")?.lowercase().orEmpty()
         return when {

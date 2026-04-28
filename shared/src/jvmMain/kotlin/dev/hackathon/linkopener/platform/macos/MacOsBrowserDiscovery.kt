@@ -28,7 +28,7 @@ class MacOsBrowserDiscovery(
 
         browsers
             .filterNotNull()
-            .distinctBy { it.bundleId }
+            .distinctBy { it.applicationPath }
             .sortedBy { it.displayName.lowercase() }
     }
 

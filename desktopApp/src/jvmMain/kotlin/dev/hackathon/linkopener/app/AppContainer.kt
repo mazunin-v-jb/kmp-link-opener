@@ -17,6 +17,7 @@ import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.AutoStartManager
 import dev.hackathon.linkopener.platform.BrowserDiscovery
 import dev.hackathon.linkopener.platform.PlatformFactory
+import dev.hackathon.linkopener.platform.UrlReceiver
 import dev.hackathon.linkopener.ui.settings.SettingsViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +40,7 @@ class AppContainer {
 
     private val autoStartManager: AutoStartManager = PlatformFactory.createAutoStartManager()
     private val browserDiscovery: BrowserDiscovery = PlatformFactory.createBrowserDiscovery()
+    val urlReceiver: UrlReceiver = PlatformFactory.createUrlReceiver()
 
     private val appInfoRepository: AppInfoRepository = AppInfoRepositoryImpl()
     private val browserRepository: BrowserRepository = BrowserRepositoryImpl(browserDiscovery)
@@ -55,8 +57,14 @@ class AppContainer {
     val setAutoStartUseCase: SetAutoStartUseCase = SetAutoStartUseCase(settingsRepository)
     val setBrowserExcludedUseCase: SetBrowserExcludedUseCase =
         SetBrowserExcludedUseCase(settingsRepository)
+    // Must match nativeDistributions.macOS.bundleID in desktopApp/build.gradle.kts.
+    // Used to exclude ourselves from the discovered-browsers list — otherwise
+    // picking "Link Opener" as the handler would loop URLs back into our own
+    // OpenURIHandler.
+    private val ownBundleId = "dev.hackathon.linkopener"
+
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
-        DiscoverBrowsersUseCase(browserRepository)
+        DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
 
     init {
         coroutineScope.launch {
