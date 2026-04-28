@@ -15,14 +15,13 @@ import java.awt.Window
  * which still sits below a fullscreen app's overlay. To break out of that we
  * need the underlying NSWindow's `collectionBehavior` to include
  * `NSWindowCollectionBehaviorFullScreenAuxiliary`, plus a level high enough
- * to draw over the menu bar (NSStatusWindowLevel).
+ * to draw above the menu bar (NSStatusWindowLevel).
  *
  * AWT does not expose either property, so we reach through the AWT peer
  * chain via reflection (requires the `--add-opens` JVM args set in
  * desktopApp/build.gradle.kts), then call into libobjc with JNA.
  *
- * No-op on non-macOS hosts and on any reflection failure — the picker still
- * works, just won't overlay fullscreen apps.
+ * Logs each step so misbehaviour is debuggable from gradle/IDEA console.
  */
 object MacOsAlwaysOnTopOverFullScreen {
 
@@ -32,36 +31,54 @@ object MacOsAlwaysOnTopOverFullScreen {
     private const val CAN_JOIN_ALL_SPACES = 1L          // 1 << 0
     private const val FULL_SCREEN_AUXILIARY = 1L shl 8  // 256
 
+    private const val TAG = "[picker.fullscreen]"
+
     private val isMacOs: Boolean by lazy {
         System.getProperty("os.name")?.lowercase()?.contains("mac") == true
     }
 
     private val objc: ObjC? by lazy {
         if (!isMacOs) null
-        else runCatching { Native.load("objc", ObjC::class.java) }.getOrNull()
+        else runCatching { Native.load("objc", ObjC::class.java) }
+            .onFailure { println("$TAG failed to load libobjc: ${it.message}") }
+            .getOrNull()
     }
 
     fun apply(window: Window) {
-        if (!isMacOs) return
+        if (!isMacOs) {
+            println("$TAG skipped (host is not macOS)")
+            return
+        }
         val lib = objc ?: return
+
+        val nsWindowPtr = try {
+            nsWindowPointer(window)
+        } catch (t: Throwable) {
+            println("$TAG reflection failed: ${t::class.simpleName}: ${t.message}")
+            return
+        }
+        if (nsWindowPtr == null) {
+            println("$TAG NSWindow pointer is null (peer not attached?)")
+            return
+        }
+
         try {
-            val nsWindowPtr = nsWindowPointer(window) ?: return
-            sendMessage(lib, nsWindowPtr, "setLevel:", NativeLong(NS_STATUS_WINDOW_LEVEL))
-            sendMessage(
-                lib, nsWindowPtr, "setCollectionBehavior:",
+            val setLevelSel = lib.sel_registerName("setLevel:")
+            val setBehaviorSel = lib.sel_registerName("setCollectionBehavior:")
+            lib.objc_msgSend(nsWindowPtr, setLevelSel, NativeLong(NS_STATUS_WINDOW_LEVEL))
+            lib.objc_msgSend(
+                nsWindowPtr,
+                setBehaviorSel,
                 NativeLong(CAN_JOIN_ALL_SPACES or FULL_SCREEN_AUXILIARY),
             )
-        } catch (t: Throwable) {
-            System.err.println(
-                "[MacOsAlwaysOnTopOverFullScreen] Failed to elevate NSWindow level: ${t.message}. " +
-                    "Picker will still appear but may sit below fullscreen apps."
+            println(
+                "$TAG applied — level=$NS_STATUS_WINDOW_LEVEL, " +
+                    "behavior=${CAN_JOIN_ALL_SPACES or FULL_SCREEN_AUXILIARY}, " +
+                    "ptr=0x${java.lang.Long.toHexString(Pointer.nativeValue(nsWindowPtr))}",
             )
+        } catch (t: Throwable) {
+            println("$TAG objc_msgSend failed: ${t::class.simpleName}: ${t.message}")
         }
-    }
-
-    private fun sendMessage(lib: ObjC, target: Pointer, selector: String, vararg args: Any?) {
-        val sel = lib.sel_registerName(selector)
-        lib.objc_msgSend(target, sel, *args)
     }
 
     private fun nsWindowPointer(window: Window): Pointer? {
@@ -85,9 +102,18 @@ object MacOsAlwaysOnTopOverFullScreen {
         return if (raw == 0L) null else Pointer(raw)
     }
 
+    /**
+     * Explicit (non-vararg) signature for objc_msgSend. JNA's vararg dispatch
+     * doesn't match the arm64 macOS calling convention reliably for NSInteger
+     * arguments — declaring the exact signature keeps it sane.
+     *
+     * Both setLevel: and setCollectionBehavior: take a single NSInteger /
+     * NSUInteger (== signed/unsigned long on 64-bit Apple) and return void;
+     * one signature covers both.
+     */
     @Suppress("FunctionName")
     private interface ObjC : Library {
-        fun objc_msgSend(receiver: Pointer?, selector: Pointer?, vararg args: Any?): Pointer?
+        fun objc_msgSend(receiver: Pointer, selector: Pointer, arg: NativeLong): Pointer?
         fun sel_registerName(name: String): Pointer
     }
 }
