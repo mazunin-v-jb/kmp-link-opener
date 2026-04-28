@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Tray
@@ -19,8 +18,6 @@ import dev.hackathon.linkopener.ui.strings.resolveStrings
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
 import java.awt.MouseInfo
 import java.util.Locale
-
-private const val APP_ICON_PATH = "icons/app_icon.png"
 
 @Composable
 fun ApplicationScope.TrayHost(
@@ -37,12 +34,13 @@ fun ApplicationScope.TrayHost(
         resolveStrings(settings.language, systemLanguageTag)
     }
 
-    val appIconPainter = painterResource(APP_ICON_PATH)
+    val trayIconPainter = remember { loadTrayIconPainter() }
+    val appIconPainter = remember { loadAppIconPainter() }
 
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
     Tray(
-        icon = appIconPainter,
+        icon = trayIconPainter,
         tooltip = strings.appName,
         menu = {
             Item(strings.trayMenuSettings, onClick = { settingsAnchor = currentCursorPosition() })
