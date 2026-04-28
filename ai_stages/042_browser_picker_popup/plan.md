@@ -154,29 +154,59 @@ UI тесты не пишем (Compose UI testing не настроено).
 
 ## Future work / Technical debt
 
-### TD-1: заменить reflection в `MacOsAlwaysOnTopOverFullScreen` на устойчивое API
+### TD-1: overlay над fullscreen на macOS (текущая реализация не работает)
 
-**Что есть сейчас.** `MacOsAlwaysOnTopOverFullScreen` достаёт `NSWindow*` из AWT
-через reflection-цепочку в `sun.awt.AWTAccessor` → `sun.lwawt.LWWindowPeer` →
-`sun.lwawt.macosx.CFRetainedResource.ptr`, потом зовёт `setLevel:` и
-`setCollectionBehavior:` через JNA + libobjc. Требует:
+**⚠ Статус: текущий хелпер `setLevel:`/`setCollectionBehavior:` не достигает
+цели.** Picker всё ещё рендерится под fullscreen-приложениями. Логи
+показывают что JNA-вызов проходит (level/behavior реально записываются в
+NSWindow), но визуально это не пробивает fullscreen-overlay.
+
+**Что есть сейчас (нерабочая часть).** `MacOsAlwaysOnTopOverFullScreen`
+достаёт `NSWindow*` из AWT через reflection-цепочку в `sun.awt.AWTAccessor`
+→ `sun.lwawt.LWWindowPeer` → `sun.lwawt.macosx.CFRetainedResource.ptr`,
+потом зовёт `setLevel:` и `setCollectionBehavior:` через JNA + libobjc.
+Требует:
 - `--add-exports java.desktop/sun.awt=ALL-UNNAMED` (и для `sun.lwawt`,
   `sun.lwawt.macosx`)
 - `--add-opens` тех же пакетов
 - надежды на то, что Oracle не переименует поля во внутренних классах
 
-**Проблема.** `sun.*` — internal API, не public. Любой JDK upgrade может
-сломать reflection-цепочку без предупреждения. JEP 403 (Strongly Encapsulate
-JDK Internals) идёт в сторону полной блокировки `--add-opens` для
-internals. Сейчас уже warning «Restricted methods will be blocked in a
-future release» в логах.
+**Что пробовали, что не помогло (на macOS Sequoia / Darwin 25):**
+
+| Попытка | Результат |
+|---|---|
+| `level = NSStatusWindowLevel` (25), `behavior = CanJoinAllSpaces \| FullScreenAuxiliary` (257) | JNA-вызов проходит. Picker всё ещё под fullscreen. |
+| `level = NSScreenSaverWindowLevel` (1000), behavior тот же | JNA-вызов проходит. Picker всё ещё под fullscreen. |
+
+**Гипотеза почему не работает.** Compose Desktop рендерит окно как обычный
+`NSWindow`, не `NSPanel`. На macOS fullscreen-overlay (то что приходит
+поверх fullscreen-приложений — например окно поиска Spotlight или попапы
+Bumpr/Choosy) работает только для `NSPanel` с правильным styleMask
+(`NSWindowStyleMaskNonactivatingPanel`). Просто `setLevel:` на обычном
+NSWindow выставляет уровень в Z-order пределах одной Space, но через
+fullscreen-Space barrier не пробивается.
+
+**Что попробовать в следующем заходе:**
+
+1. **Превратить NSWindow в NSPanel** через swapping styleMask + isa-swizzling
+   (через JNA на `object_setClass:`). Грязный хак, но известно что работает.
+2. **Использовать `orderFrontRegardless` + `setHidesOnDeactivate:NO`** —
+   возможно одной комбинации level/behavior мало, нужно ещё активно
+   выводить вперёд при показе.
+3. **Создавать picker-окно как НЕ-AWT NSPanel напрямую** через JNA, и
+   рендерить туда Skia (как Compose Desktop делает внутри). Это самый
+   чистый путь, но фактически переписывание Compose Window для macOS.
+4. **Принять ограничение** — picker работает над не-fullscreen окнами;
+   для fullscreen пользователю придётся сначала выйти из fullscreen.
+   Это поведение многих JVM-приложений.
 
 **Это не security-проблема** (mods bypass-flags открывают internals
 **нашему же коду**, не атакующему), но maintainability-долг.
 
 **Текущий fallback.** На любой reflection failure хелпер логирует ошибку и
 тихо отказывает — picker всё равно показывается, просто на macOS
-fullscreen-приложениях рендерится под ними как до фикса.
+fullscreen-приложениях рендерится под ними. По факту тот же эффект что
+сейчас и есть.
 
 **Кандидаты на миграцию** (в порядке трудозатрат):
 

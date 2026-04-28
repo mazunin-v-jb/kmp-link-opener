@@ -23,23 +23,25 @@ import java.awt.Window
  *
  * Logs each step so misbehaviour is debuggable from gradle/IDEA console.
  *
- * **TECHNICAL DEBT — migrate before public release.** Pre-release we should
- * replace this reflection chain with either:
- *   - [rococoa](https://github.com/iterate-ch/rococoa) — typed Cocoa
- *     bindings for the JVM, hides the reflection brittleness behind a
- *     library, ~500 KB to the dist;
- *   - or a small native shim (Objective-C compiled to a `.dylib` shipped
- *     with the app, called via JNA) — most stable but adds cross-compile
- *     to the build.
+ * **⚠ STATUS — does not actually overlay fullscreen apps on macOS Sequoia.**
+ * The JNA call succeeds (level + collectionBehavior are written into the
+ * NSWindow), but the picker still renders below fullscreen apps in
+ * practice. Suspected cause: Compose Desktop windows are regular
+ * `NSWindow`, not `NSPanel`; fullscreen-Space overlay tends to require
+ * `NSPanel` with a non-activating panel style mask. Bumping level from
+ * NSStatusWindowLevel (25) to NSScreenSaverWindowLevel (1000) did not
+ * change the result.
  *
- * The current approach is brittle to JDK upgrades — `sun.awt.*` /
- * `sun.lwawt.*` are Oracle-internal and may change shape in any release;
- * JEP 403 trends point at eventual hard blocking of `--add-opens` for
- * internals. Current behaviour on failure: graceful fallback (we log
- * to stderr and the picker still works, just without fullscreen overlay).
+ * The helper still runs because (a) the diagnostic logging is useful for
+ * the eventual migration, (b) the level/behavior writes are harmless even
+ * when they don't help, (c) the `--add-exports` plumbing it requires is
+ * the same plumbing the migration target will need.
  *
- * Tracked under the "Future work / Technical debt" section in
- * `ai_stages/042_browser_picker_popup/plan.md`.
+ * Tracked as TD-1 under "Future work / Technical debt" in
+ * `ai_stages/042_browser_picker_popup/plan.md` — see that doc for the
+ * matrix of what we tried and the next attempts to try (NSPanel via
+ * isa-swizzling, native NSPanel through a JNI/native shim, or just
+ * accepting the limitation).
  */
 object MacOsAlwaysOnTopOverFullScreen {
 
