@@ -83,6 +83,7 @@ class AppContainer {
         updateTheme = updateThemeUseCase,
         updateLanguage = updateLanguageUseCase,
         setAutoStart = setAutoStartUseCase,
+        setBrowserExcluded = setBrowserExcludedUseCase,
         scope = coroutineScope,
     )
 }

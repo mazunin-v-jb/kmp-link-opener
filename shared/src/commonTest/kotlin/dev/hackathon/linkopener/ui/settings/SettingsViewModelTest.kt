@@ -7,6 +7,7 @@ import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
+import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import kotlin.test.Test
@@ -67,6 +68,7 @@ class SettingsViewModelTest {
         updateTheme = UpdateThemeUseCase(repo),
         updateLanguage = UpdateLanguageUseCase(repo),
         setAutoStart = SetAutoStartUseCase(repo),
+        setBrowserExcluded = SetBrowserExcludedUseCase(repo),
         scope = scope,
     )
 

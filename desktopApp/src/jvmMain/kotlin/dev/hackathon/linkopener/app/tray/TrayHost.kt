@@ -28,21 +28,20 @@ fun ApplicationScope.TrayHost(
     val settingsViewModel = remember(container) { container.newSettingsViewModel() }
     val settings by settingsViewModel.settings.collectAsState()
 
-    // Captured once at startup. Locale.getDefault() reads the JVM's locale
-    // which on macOS reflects the system "Region & Language" preference at
-    // the time the app launched. Changing OS locale will require restart —
-    // acceptable for the prototype.
     val systemLanguageTag = remember { Locale.getDefault().language }
 
     val strings = remember(settings.language, systemLanguageTag) {
         resolveStrings(settings.language, systemLanguageTag)
     }
 
+    val trayIconPainter = remember { loadTrayIconPainter() }
+    val appIconPainter = remember { loadAppIconPainter() }
+
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
     Tray(
-        icon = remember { PlaceholderTrayIcon() },
-        tooltip = appInfo.name,
+        icon = trayIconPainter,
+        tooltip = strings.appName,
         menu = {
             Item(strings.trayMenuSettings, onClick = { settingsAnchor = currentCursorPosition() })
             Item(strings.trayMenuQuit, onClick = onExit)
@@ -53,17 +52,24 @@ fun ApplicationScope.TrayHost(
     if (anchor != null) {
         val windowState = rememberWindowState(
             position = anchor,
-            width = 720.dp,
-            height = 480.dp,
+            width = 960.dp,
+            height = 640.dp,
         )
         Window(
             onCloseRequest = { settingsAnchor = null },
-            title = appInfo.name + strings.trayWindowSettingsSuffix,
+            title = strings.appName + strings.trayWindowSettingsSuffix,
             state = windowState,
+            icon = appIconPainter,
             alwaysOnTop = true,
         ) {
             LinkOpenerTheme(theme = settings.theme) {
-                SettingsScreen(viewModel = settingsViewModel, strings = strings)
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    strings = strings,
+                    appVersion = appInfo.version,
+                    appIconPainter = appIconPainter,
+                    onCloseRequest = { settingsAnchor = null },
+                )
             }
         }
     }
