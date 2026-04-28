@@ -118,3 +118,29 @@ defaultBrowserInstructions(currentOs)  // top-level @Composable, читает st
 ## Чувствительные данные
 
 Нет.
+
+## Implementation notes (что фактически попало в main)
+
+План выше описывает **первоначальную** стратегию. Реализация по итогам нескольких итераций отличается — фиксируем здесь, чтобы не вводить в заблуждение тех, кто читает план постфактум. Подробности — в commit history `stage/05-compose-resources-i18n` (см. ветку с тем же именем) и сквошнутом `d65b9f7 Stage/05 compose resources i18n (#5)`.
+
+**Что прижилось как в плане:**
+- XML в `shared/src/commonMain/composeResources/values/strings.xml` + `values-ru/strings.xml` с теми же ключами snake_case + `string-array` для per-OS инструкций.
+- Удалили `Strings.kt`, `StringsResolutionTest.kt`, `StringsLabelTest.kt`. Все call sites переехали на `stringResource(Res.string.X)` / `stringArrayResource(Res.array.X)`.
+- `LocalizedLabels.kt` — top-level @Composable helpers `themeLabel` / `languageLabel` / `defaultBrowserInstructions`.
+
+**Что пришлось переделать:**
+- **Не** `key(resolvedLocale) + DisposableEffect`. Эта связка ломала window-jevel композицию: при смене языка Settings-окно закрывалось (потому что `key(...)` оборачивал Window), а активная секция в SettingsScreen не пересоздавалась (`Crossfade` кеширует per-targetState).
+- Финальная схема: `Locale.setDefault` ставится **синхронно на click thread** в `SettingsViewModel.onLanguageSelected` ДО запуска `scope.launch { updateLanguage(...) }`. Плюс на старте — в `AppContainer.init` для уже сохранённого языка. По сути — выносим side effect наружу композиции.
+- `Crossfade(activeSection)` выпилен (после ребейза с `041` он там и появился). Используется обычное `when (activeSection)`.
+- Добавлен `LocalAppLocale = compositionLocalOf { "" }` (`ui/strings/LocalAppLocale.kt`) — CompositionLocal-nonce, который на верху smart-skipped композиций (TopAppBar, NotDefaultBanner, Sidebar) форсит recomposition при смене языка. Без него Compose smart-skip оставлял эти композаблы со старой строкой, потому что их параметры технически не менялись.
+
+**Side effect глобальный, как и предупреждалось.** `Locale.setDefault` влияет на DateFormat/NumberFormat/Collator — у нас потребителей таких форматтеров нет, оставлено как «неприятное, но приемлемое».
+
+**Что в acceptance criteria выполнено по факту:**
+
+- [x] `./gradlew build` зелёный.
+- [x] `./gradlew :shared:jvmTest` — все тесты проходят (116 шт. на момент закрытия стадии).
+- [x] `Strings.kt` отсутствует.
+- [x] Test picker в трее — строки локализованы.
+- [x] Default-browser banner / instructions — локализованы.
+- [x] Переключение en ↔ ru работает с первого клика, без необходимости «сбегать в другой раздел и вернуться» (это был баг в одной из промежуточных итераций).
