@@ -24,16 +24,6 @@ Resolved items are removed (git log preserves history) — keep the list short s
 
 ---
 
-## TD-3 — UI-surface coverage gap
-
-**Where:** Kover excludes list in `shared/build.gradle.kts`; numbers in `CLAUDE.md` § "Test coverage".
-
-**What:** Class coverage on `:shared` slipped from a 92.5% line peak to 34.2% line / 75.7% class as new UI surface (BrowserPickerScreen, BrowsersState, NavSection variants, banner code, picker chrome) landed without unit tests. Most of that surface isn't on the Kover excludes list, so it counts against the report.
-
-**Action:** decide per file whether each new piece is (a) intentional untested chrome (extend excludes, keep chrome as smoke-tested), or (b) genuinely worth a unit test (add one, possibly with compose-ui-test). Don't bulk-exclude — the value is in the case-by-case decision.
-
----
-
 ## TD-4 — macOS deep-link lands on wrong settings pane
 
 **Where:** `shared/src/jvmMain/kotlin/dev/hackathon/linkopener/platform/macos/MacOsDefaultBrowserService.kt` (TODO comment in the same file).

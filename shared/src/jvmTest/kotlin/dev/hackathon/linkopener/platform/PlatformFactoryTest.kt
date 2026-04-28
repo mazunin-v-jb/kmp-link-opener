@@ -2,6 +2,8 @@ package dev.hackathon.linkopener.platform
 
 import dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserDiscovery
+import dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService
+import dev.hackathon.linkopener.platform.macos.MacOsLinkLauncher
 import org.junit.Assume.assumeTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -86,6 +88,19 @@ class PlatformFactoryTest {
     @Test
     fun createUrlReceiverReturnsJvmImpl() {
         assertNotNull(PlatformFactory.createUrlReceiver())
+    }
+
+    @Test
+    fun createDefaultBrowserServiceReturnsMacOsImplOnMacHost() {
+        assumeTrue("requires macOS host", onMacOs)
+        val service = PlatformFactory.createDefaultBrowserService(ownBundleId = "dev.test.example")
+        assertTrue(service is MacOsDefaultBrowserService)
+    }
+
+    @Test
+    fun createLinkLauncherReturnsMacOsImplOnMacHost() {
+        assumeTrue("requires macOS host", onMacOs)
+        assertTrue(PlatformFactory.createLinkLauncher() is MacOsLinkLauncher)
     }
 
     @Test

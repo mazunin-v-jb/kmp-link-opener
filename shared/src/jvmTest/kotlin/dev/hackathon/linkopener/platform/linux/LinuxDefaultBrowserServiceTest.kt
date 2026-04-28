@@ -1,5 +1,6 @@
 package dev.hackathon.linkopener.platform.linux
 
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,5 +24,14 @@ class LinuxDefaultBrowserServiceTest {
     @Test
     fun openSystemSettingsReturnsFalseWithoutSideEffects() = runTest {
         assertEquals(false, service.openSystemSettings())
+    }
+
+    @Test
+    fun observeIsDefaultBrowserEmitsCurrentValueOnceAndCompletes() = runTest {
+        // Linux service doesn't override the interface default, so this exercises
+        // the DefaultBrowserService.observeIsDefaultBrowser default impl: emit
+        // the current isDefaultBrowser() once and complete.
+        val emissions = service.observeIsDefaultBrowser().toList()
+        assertEquals(listOf(false), emissions)
     }
 }

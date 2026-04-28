@@ -47,14 +47,27 @@ kover {
         filters {
             excludes {
                 // UI surface — exercised manually / by stage 4.5 design system, not unit-tested.
+                // ComposableSingletons* are the synthetic Kt classes Compose's compiler
+                // emits for `@Composable () -> Unit` lambdas captured from each screen.
                 classes(
                     "dev.hackathon.linkopener.ui.icons.**",
                     "dev.hackathon.linkopener.ui.settings.SettingsScreen*",
                     "dev.hackathon.linkopener.ui.settings.NavSection*",
+                    "dev.hackathon.linkopener.ui.settings.ComposableSingletons*",
+                    "dev.hackathon.linkopener.ui.picker.BrowserPickerScreen*",
+                    "dev.hackathon.linkopener.ui.picker.ComposableSingletons*",
+                    "dev.hackathon.linkopener.ui.strings.LocalAppLocaleKt*",
+                    "dev.hackathon.linkopener.ui.strings.LocalizedLabelsKt*",
                     "dev.hackathon.linkopener.ui.theme.LinkOpenerTheme*",
                     "dev.hackathon.linkopener.ui.theme.LinkOpenerColors*",
                     "dev.hackathon.linkopener.ui.theme.LinkOpenerTypography*",
                     "dev.hackathon.linkopener.ui.tray.**",
+                )
+                // Compose Resources generates accessor classes (`Res`, `String0_*`,
+                // `Array0_*`, `ActualResourceCollectorsKt`) — they're build-time
+                // generated, not authored.
+                classes(
+                    "kmp_link_opener.shared.generated.**",
                 )
                 // Process-spawning / framework-glue layers we'd only smoke-test on the
                 // matching OS. The default-browser services on macOS / Windows shell out

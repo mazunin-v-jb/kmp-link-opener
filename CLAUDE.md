@@ -131,27 +131,25 @@ Other notable deps: `kotlinx-coroutines` (with `kotlinx-coroutines-swing` for th
 
 ## Test coverage
 
-Kover is wired on `:shared`. 116 jvm tests are green on main. Current numbers (run `./gradlew :shared:koverHtmlReport` to refresh):
+Kover is wired on `:shared`. 133 jvm tests are green on main. Current numbers (run `./gradlew :shared:koverHtmlReport` to refresh):
 
 | Metric | Latest main |
 | --- | --- |
-| Class | 75.7% |
-| Method | 40.4% |
-| Branch | 46.1% |
-| Line | 34.2% |
-| Instruction | 30.2% |
+| Class | 97.1% |
+| Method | 97.8% |
+| Branch | 68.4% |
+| Line | 97.6% |
+| Instruction | 93.5% |
 
-The line/method drop versus the earlier 92.5% / 71.1% peak is real — UI surface grew (BrowserPickerScreen, BrowsersState, NavSection variants, banner code, picker chrome) without unit tests, and most of that surface isn't excluded from Kover. The set of *intentionally* excluded classes is still:
+The set of *intentionally* excluded classes:
 
-- `JvmUrlReceiver` (wraps `Desktop.setOpenURIHandler`)
-- `PlutilRunner` (`ProcessBuilder` to `/usr/bin/plutil`)
-- `MacOsAutoStartManager` (writes a LaunchAgent plist)
-- `MacOsDefaultBrowserService` and `WindowsDefaultBrowserService` (deep-link to System Settings via `open` / `cmd /c start`)
-- A few stage 4.5 UI scaffolding classes (Compose UI is exercised by the design system, not unit-tested)
+- **Process / framework glue (smoke-tested only on the matching OS):** `JvmUrlReceiver`, `PlutilRunner`, `MacOsAutoStartManager`, `MacOsDefaultBrowserService`, `WindowsDefaultBrowserService`. Linux's default-browser service IS unit-tested because it's a no-op stub.
+- **Compose UI surface:** `SettingsScreen*` + its `ComposableSingletons*`, `BrowserPickerScreen*` + its `ComposableSingletons*`, `LocalizedLabelsKt`, `LocalAppLocaleKt`, the `theme/` design tokens (`LinkOpenerTheme/Colors/Typography`), the icon vectors in `ui/icons/**`, and the `ui/tray/**` Compose nodes. None of those carry meaningful logic; the design system itself was written manually and is exercised by hand on macOS.
+- **Generated code:** `kmp_link_opener.shared.generated.**` (Compose Resources accessor classes — `Res`, `String0_*`, `Array0_*`, `ActualResourceCollectorsKt`).
 
-The Linux default-browser service IS unit-tested because it's a no-op stub. Smoke tests for macOS-only logic guard themselves with `Assume.assumeTrue("…", isMacOs)` so jvmTest stays portable.
+Smoke tests for macOS-only logic guard themselves with `Assume.assumeTrue("…", isMacOs)` so `:shared:jvmTest` stays portable on CI runners that aren't macOS.
 
-Tracked as the "UI-surface coverage gap" item in `TECHDEBT.md`. Decide per UI piece whether to (a) extend the Kover excludes list to match its real role as untested chrome, or (b) actually add tests with compose-ui-test.
+The remaining ~2.4% line gap is residual: the default `processFactory` lambda in `MacOsLinkLauncher` (would need a real `open` exec to cover), the non-mac arms of `PlatformFactory` dispatch (`currentOs` is `lazy` so we can't rebind it within a single JVM), and a couple of tiny synthetic lambdas. Branch coverage trails because of multi-arm `when` over `HostOs` — the off-platform arms never fire on a macOS host. Adding compose-ui-test to cover the remaining UI is a possible future move; for now the manual UI excludes match reality.
 
 ## Things to leave alone
 
