@@ -27,11 +27,27 @@ class MacOsDefaultBrowserService(
 
     private fun settingsUrlForCurrentOs(): String {
         val major = osVersion.substringBefore('.').toIntOrNull() ?: 0
-        // macOS 13 (Ventura) renamed System Preferences to System Settings and
-        // moved "Default web browser" from General into Desktop & Dock. The
-        // legacy `com.apple.preference.general` URL still launches Settings on
-        // newer versions but lands on Appearance, which is wrong. Pick the
-        // right pane based on the host's macOS major version.
+        // TODO: figure out the correct deep-link URL for macOS Sonoma+
+        //  (Darwin 25 / macOS 26-ish). Neither
+        //  `x-apple.systempreferences:com.apple.preference.general` nor
+        //  `com.apple.Desktop-Settings.extension` lands on the actual
+        //  "Default web browser" dropdown on the test machine — the legacy
+        //  one redirects to Appearance, the Desktop-Settings one drops the
+        //  user on Wallpaper / something unrelated.
+        //
+        //  Things to try:
+        //   - probe `defaults read /System/Library/PreferencePanes/.../*.plist`
+        //     to enumerate available pane bundle IDs on the host
+        //   - try `com.apple.DesktopAndDock-Settings.extension` and other
+        //     plausible Settings extension IDs
+        //   - or shell out to `osascript -e 'tell app "System Settings" to
+        //     reveal pane id "..."'` for a more structured way to navigate
+        //   - last resort: open System Settings root and rely on the
+        //     in-app instruction text to guide the user
+        //
+        //  For now we keep the version-aware fallback so the button at least
+        //  opens *some* settings pane on each macOS generation, even if it's
+        //  not the exact destination.
         return if (major >= 13) {
             "x-apple.systempreferences:com.apple.Desktop-Settings.extension"
         } else {
