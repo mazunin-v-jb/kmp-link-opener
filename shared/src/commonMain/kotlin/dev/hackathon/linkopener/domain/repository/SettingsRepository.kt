@@ -13,4 +13,5 @@ interface SettingsRepository {
     suspend fun updateLanguage(language: AppLanguage)
     suspend fun setAutoStart(enabled: Boolean)
     suspend fun setBrowserExcluded(id: BrowserId, excluded: Boolean)
+    suspend fun setBrowserOrder(order: List<BrowserId>)
 }

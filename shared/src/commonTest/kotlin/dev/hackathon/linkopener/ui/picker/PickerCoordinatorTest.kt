@@ -63,6 +63,27 @@ class PickerCoordinatorTest {
     }
 
     @Test
+    fun userOrderIsRespectedAfterExclusionFilter() = runTest {
+        val settings = AppSettings(
+            excludedBrowserIds = setOf(chrome.toBrowserId()),
+            browserOrder = listOf(firefox.toBrowserId(), safari.toBrowserId()),
+        )
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, chrome, firefox),
+            settings = settings,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        val state = coord.state.value
+        assertIs<PickerState.Showing>(state)
+        // Chrome filtered by exclusion, then user order pins Firefox before Safari.
+        assertEquals(listOf(firefox, safari), state.browsers)
+    }
+
+    @Test
     fun excludingOneInstallationKeepsAnotherWithSameBundleId() = runTest {
         // Two installs of Chrome (parallel versions) share a bundleId but live
         // at different paths; excluding one must not exclude the other.
@@ -216,6 +237,9 @@ class PickerCoordinatorTest {
                     else it.excludedBrowserIds - id,
                 )
             }
+        }
+        override suspend fun setBrowserOrder(order: List<BrowserId>) {
+            _settings.update { it.copy(browserOrder = order) }
         }
     }
 

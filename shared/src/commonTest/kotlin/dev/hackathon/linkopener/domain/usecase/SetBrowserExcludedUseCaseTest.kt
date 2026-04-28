@@ -59,5 +59,6 @@ class SetBrowserExcludedUseCaseTest {
         override suspend fun setBrowserExcluded(id: BrowserId, excluded: Boolean) {
             calls.add(id to excluded)
         }
+        override suspend fun setBrowserOrder(order: List<BrowserId>) = error("not used")
     }
 }

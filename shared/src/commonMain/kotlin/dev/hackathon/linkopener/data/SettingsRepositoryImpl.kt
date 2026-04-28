@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -48,11 +49,18 @@ class SettingsRepositoryImpl(
         _settings.update { it.copy(excludedBrowserIds = updated) }
     }
 
+    override suspend fun setBrowserOrder(order: List<BrowserId>) {
+        if (order == _settings.value.browserOrder) return
+        store.putString(KEY_BROWSER_ORDER, encodeOrder(order))
+        _settings.update { it.copy(browserOrder = order) }
+    }
+
     private fun load(): AppSettings = AppSettings(
         theme = readEnum(KEY_THEME, AppTheme.entries, AppTheme.System),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
         autoStartEnabled = store.getBoolean(KEY_AUTO_START, false),
         excludedBrowserIds = decodeIds(store.getStringOrNull(KEY_EXCLUSIONS)),
+        browserOrder = decodeOrder(store.getStringOrNull(KEY_BROWSER_ORDER)),
     )
 
     private fun <E : Enum<E>> readEnum(key: String, values: List<E>, default: E): E {
@@ -72,10 +80,22 @@ class SettingsRepositoryImpl(
         }.getOrDefault(emptySet())
     }
 
+    private fun encodeOrder(ids: List<BrowserId>): String =
+        json.encodeToString(ListSerializer(String.serializer()), ids.map { it.value })
+
+    private fun decodeOrder(raw: String?): List<BrowserId> {
+        if (raw.isNullOrEmpty()) return emptyList()
+        return runCatching {
+            json.decodeFromString(ListSerializer(String.serializer()), raw)
+                .map(::BrowserId)
+        }.getOrDefault(emptyList())
+    }
+
     private companion object {
         const val KEY_THEME = "settings.theme"
         const val KEY_LANGUAGE = "settings.language"
         const val KEY_AUTO_START = "settings.autoStart"
         const val KEY_EXCLUSIONS = "settings.exclusions"
+        const val KEY_BROWSER_ORDER = "settings.browserOrder"
     }
 }

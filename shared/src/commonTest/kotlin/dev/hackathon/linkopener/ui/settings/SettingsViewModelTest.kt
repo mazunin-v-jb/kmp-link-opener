@@ -18,6 +18,7 @@ import kotlinx.coroutines.cancel
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
+import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.DefaultBrowserService
@@ -140,6 +141,7 @@ class SettingsViewModelTest {
                 updateLanguage = UpdateLanguageUseCase(FakeSettingsRepository()),
                 setAutoStart = SetAutoStartUseCase(FakeSettingsRepository()),
                 setBrowserExcluded = SetBrowserExcludedUseCase(FakeSettingsRepository()),
+                setBrowserOrder = SetBrowserOrderUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
                 getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
@@ -236,6 +238,51 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun onMoveBrowserDownSwapsWithNeighbour() = runTest {
+        val repo = FakeSettingsRepository()
+        val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
+        val chrome = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome.app", null)
+        val firefox = Browser("org.mozilla.firefox", "Firefox", "/Applications/Firefox.app", null)
+        val vm = newViewModel(
+            repo = repo,
+            browsers = listOf(safari, chrome, firefox),
+            scope = this,
+        )
+        testScheduler.advanceUntilIdle()
+
+        vm.onMoveBrowserDown(BrowserId("/Applications/Safari.app"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                BrowserId("/Applications/Chrome.app"),
+                BrowserId("/Applications/Safari.app"),
+                BrowserId("/Applications/Firefox.app"),
+            ),
+            vm.settings.value.browserOrder,
+        )
+    }
+
+    @Test
+    fun onMoveBrowserUpAtFirstPositionIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
+        val chrome = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome.app", null)
+        val vm = newViewModel(
+            repo = repo,
+            browsers = listOf(safari, chrome),
+            scope = this,
+        )
+        testScheduler.advanceUntilIdle()
+
+        vm.onMoveBrowserUp(BrowserId("/Applications/Safari.app"))
+        testScheduler.advanceUntilIdle()
+
+        // No persisted order change; stays at default empty.
+        assertEquals(emptyList(), vm.settings.value.browserOrder)
+    }
+
+    @Test
     fun onBrowserExclusionToggledRemovesBrowser() = runTest {
         val repo = FakeSettingsRepository()
         val vm = newViewModel(repo = repo, scope = this)
@@ -262,6 +309,7 @@ class SettingsViewModelTest {
         updateLanguage = UpdateLanguageUseCase(repo),
         setAutoStart = SetAutoStartUseCase(repo),
         setBrowserExcluded = SetBrowserExcludedUseCase(repo),
+        setBrowserOrder = SetBrowserOrderUseCase(repo),
         discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
         observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(defaultBrowserService),
         getIsDefaultBrowser = GetIsDefaultBrowserUseCase(defaultBrowserService),
@@ -304,6 +352,10 @@ class SettingsViewModelTest {
                     else it.excludedBrowserIds - id,
                 )
             }
+        }
+
+        override suspend fun setBrowserOrder(order: List<BrowserId>) {
+            _settings.update { it.copy(browserOrder = order) }
         }
     }
 

@@ -4,6 +4,8 @@ import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.toBrowserId
+import dev.hackathon.linkopener.domain.applyUserOrder
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.GetIsDefaultBrowserUseCase
@@ -12,6 +14,7 @@ import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
+import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import kotlinx.coroutines.CancellationException
@@ -28,6 +31,7 @@ class SettingsViewModel(
     private val updateLanguage: UpdateLanguageUseCase,
     private val setAutoStart: SetAutoStartUseCase,
     private val setBrowserExcluded: SetBrowserExcludedUseCase,
+    private val setBrowserOrder: SetBrowserOrderUseCase,
     private val discoverBrowsers: DiscoverBrowsersUseCase,
     observeIsDefaultBrowser: ObserveIsDefaultBrowserUseCase,
     private val getIsDefaultBrowser: GetIsDefaultBrowserUseCase,
@@ -44,6 +48,9 @@ class SettingsViewModel(
 
     val canOpenSystemSettings: Boolean = getCanOpenSystemSettings()
 
+    // _browsers carries the list as the user sees it: ordering is applied at
+    // load time and again whenever the user reorders. Avoids a long-lived
+    // combine/stateIn coroutine, which keeps `runTest` from completing.
     private val _browsers = MutableStateFlow<BrowsersState>(BrowsersState.Loading)
     val browsers: StateFlow<BrowsersState> = _browsers.asStateFlow()
 
@@ -103,6 +110,27 @@ class SettingsViewModel(
         scope.launch { setBrowserExcluded(id, excluded) }
     }
 
+    fun onMoveBrowserUp(id: BrowserId) = reorder(id, -1)
+
+    fun onMoveBrowserDown(id: BrowserId) = reorder(id, +1)
+
+    private fun reorder(id: BrowserId, delta: Int) {
+        val state = _browsers.value as? BrowsersState.Loaded ?: return
+        val list = state.browsers
+        val from = list.indexOfFirst { it.toBrowserId() == id }
+        if (from < 0) return
+        val to = from + delta
+        if (to < 0 || to >= list.size) return
+        val swapped = list.toMutableList().apply {
+            val tmp = this[from]; this[from] = this[to]; this[to] = tmp
+        }
+        // Update the visible list eagerly so the row moves on click without
+        // waiting for the persistence round-trip; persist the new order in the
+        // background.
+        _browsers.value = BrowsersState.Loaded(swapped)
+        scope.launch { setBrowserOrder(swapped.map { it.toBrowserId() }) }
+    }
+
     /**
      * User-triggered re-scan of installed browsers (refresh / retry buttons).
      * Bypasses the repository cache so a browser installed while Settings
@@ -116,7 +144,10 @@ class SettingsViewModel(
         scope.launch {
             _browsers.value = BrowsersState.Loading
             try {
-                _browsers.value = BrowsersState.Loaded(discoverBrowsers(forceRefresh = forceRefresh))
+                val raw = discoverBrowsers(forceRefresh = forceRefresh)
+                _browsers.value = BrowsersState.Loaded(
+                    applyUserOrder(raw, settings.value.browserOrder),
+                )
             } catch (t: CancellationException) {
                 throw t
             } catch (t: Throwable) {

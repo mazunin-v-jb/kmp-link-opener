@@ -27,6 +27,8 @@
     <string name="search_browsers">Поиск браузеров…</string>
     <string name="included">Включён</string>
     <string name="excluded">Исключён</string>
+    <string name="move_up">Переместить вверх</string>
+    <string name="move_down">Переместить вниз</string>
     <string name="system_default">По умолчанию в системе</string>
     <string name="empty_browsers_message">Установленные браузеры пока не найдены.</string>
 

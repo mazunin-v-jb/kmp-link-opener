@@ -174,6 +174,20 @@ object AppIcons {
         }
     }
 
+    val ArrowUp: ImageVector = line("ArrowUp") {
+        stroke {
+            moveTo(12f, 19f); lineTo(12f, 5f)
+            moveTo(6f, 11f); lineTo(12f, 5f); lineTo(18f, 11f)
+        }
+    }
+
+    val ArrowDown: ImageVector = line("ArrowDown") {
+        stroke {
+            moveTo(12f, 5f); lineTo(12f, 19f)
+            moveTo(6f, 13f); lineTo(12f, 19f); lineTo(18f, 13f)
+        }
+    }
+
     // TODO: replace this hand-rolled placeholder with the final design-system
     //  refresh glyph once the asset lands. Drawn here only so the Settings
     //  refresh button has a recognisable shape.

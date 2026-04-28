@@ -16,6 +16,7 @@ import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
+import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.AutoStartManager
@@ -72,6 +73,8 @@ class AppContainer {
     val setAutoStartUseCase: SetAutoStartUseCase = SetAutoStartUseCase(settingsRepository)
     val setBrowserExcludedUseCase: SetBrowserExcludedUseCase =
         SetBrowserExcludedUseCase(settingsRepository)
+    val setBrowserOrderUseCase: SetBrowserOrderUseCase =
+        SetBrowserOrderUseCase(settingsRepository)
 
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
         DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
@@ -131,6 +134,7 @@ class AppContainer {
         updateLanguage = updateLanguageUseCase,
         setAutoStart = setAutoStartUseCase,
         setBrowserExcluded = setBrowserExcludedUseCase,
+        setBrowserOrder = setBrowserOrderUseCase,
         discoverBrowsers = discoverBrowsersUseCase,
         observeIsDefaultBrowser = observeIsDefaultBrowserUseCase,
         getIsDefaultBrowser = getIsDefaultBrowserUseCase,

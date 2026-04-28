@@ -97,6 +97,7 @@ class SettingsRepositoryImplTest {
         store.putString("settings.language", "En")
         store.putBoolean("settings.autoStart", true)
         store.putString("settings.exclusions", """["chrome","brave"]""")
+        store.putString("settings.browserOrder", """["safari","chrome"]""")
 
         val repo = newRepo(store = store)
 
@@ -106,9 +107,45 @@ class SettingsRepositoryImplTest {
                 language = AppLanguage.En,
                 autoStartEnabled = true,
                 excludedBrowserIds = setOf(BrowserId("chrome"), BrowserId("brave")),
+                browserOrder = listOf(BrowserId("safari"), BrowserId("chrome")),
             ),
             repo.settings.value,
         )
+    }
+
+    @Test
+    fun setBrowserOrderPersistsList() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+        val order = listOf(BrowserId("safari"), BrowserId("chrome"), BrowserId("firefox"))
+
+        repo.setBrowserOrder(order)
+
+        assertEquals(order, repo.settings.value.browserOrder)
+        assertEquals("""["safari","chrome","firefox"]""", store.getStringOrNull("settings.browserOrder"))
+    }
+
+    @Test
+    fun setBrowserOrderIsIdempotent() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+        val order = listOf(BrowserId("a"), BrowserId("b"))
+
+        repo.setBrowserOrder(order)
+        // A second call with the same value should be a no-op (no extra emission, no rewrite).
+        repo.setBrowserOrder(order)
+
+        assertEquals(order, repo.settings.value.browserOrder)
+    }
+
+    @Test
+    fun corruptedBrowserOrderJsonFallsBackToEmpty() = runTest {
+        val store = FakeSettings()
+        store.putString("settings.browserOrder", "broken")
+
+        val repo = newRepo(store = store)
+
+        assertEquals(emptyList(), repo.settings.value.browserOrder)
     }
 
     @Test

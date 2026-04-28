@@ -86,6 +86,8 @@ import kmp_link_opener.shared.generated.resources.default_browser_status_yes
 import kmp_link_opener.shared.generated.resources.excluded as excludedStr
 import kmp_link_opener.shared.generated.resources.help as helpStr
 import kmp_link_opener.shared.generated.resources.included as includedStr
+import kmp_link_opener.shared.generated.resources.move_down
+import kmp_link_opener.shared.generated.resources.move_up
 import kmp_link_opener.shared.generated.resources.retry as retryStr
 import kmp_link_opener.shared.generated.resources.refresh_action
 import kmp_link_opener.shared.generated.resources.search_browsers
@@ -171,6 +173,8 @@ fun SettingsScreen(
                             browsersState = browsers,
                             excluded = settings.excludedBrowserIds,
                             onToggle = viewModel::onBrowserExclusionToggled,
+                            onMoveUp = viewModel::onMoveBrowserUp,
+                            onMoveDown = viewModel::onMoveBrowserDown,
                             onRetry = viewModel::refreshBrowsers,
                         )
                     }
@@ -683,6 +687,8 @@ private fun ExclusionsSection(
     browsersState: BrowsersState,
     excluded: Set<BrowserId>,
     onToggle: (BrowserId, Boolean) -> Unit,
+    onMoveUp: (BrowserId) -> Unit,
+    onMoveDown: (BrowserId) -> Unit,
     onRetry: () -> Unit,
 ) {
     SectionPane(stringResource(Res.string.section_browser_exclusions), AppIcons.Settings) {
@@ -695,6 +701,8 @@ private fun ExclusionsSection(
                     browsers = s.browsers,
                     excluded = excluded,
                     onToggle = onToggle,
+                    onMoveUp = onMoveUp,
+                    onMoveDown = onMoveDown,
                 )
             }
             is BrowsersState.Error -> ErrorCard(s.message, onRetry)
@@ -756,12 +764,19 @@ private fun BrowserList(
     browsers: List<Browser>,
     excluded: Set<BrowserId>,
     onToggle: (BrowserId, Boolean) -> Unit,
+    onMoveUp: (BrowserId) -> Unit,
+    onMoveDown: (BrowserId) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     val visible = remember(query, browsers) {
         if (query.isBlank()) browsers
         else browsers.filter { it.displayName.contains(query, ignoreCase = true) }
     }
+    // Up/down operate on the unfiltered ordered list — searching narrows the
+    // visible rows but reorder buttons still walk the full list, so disable
+    // them when a query is active to avoid surprising "move past hidden row"
+    // jumps. The buttons re-enable as soon as the search clears.
+    val reorderEnabled = query.isBlank()
 
     Column {
         SearchField(
@@ -785,10 +800,15 @@ private fun BrowserList(
         ) {
             visible.forEachIndexed { index, browser ->
                 val id = browser.toBrowserId()
+                val absoluteIndex = browsers.indexOf(browser)
                 BrowserRow(
                     browser = browser,
                     isExcluded = id in excluded,
+                    canMoveUp = reorderEnabled && absoluteIndex > 0,
+                    canMoveDown = reorderEnabled && absoluteIndex < browsers.lastIndex,
                     onToggle = { newValue -> onToggle(id, newValue) },
+                    onMoveUp = { onMoveUp(id) },
+                    onMoveDown = { onMoveDown(id) },
                 )
                 if (index != visible.lastIndex) {
                     Box(
@@ -808,7 +828,11 @@ private fun BrowserList(
 private fun BrowserRow(
     browser: Browser,
     isExcluded: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
     onToggle: (Boolean) -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -838,6 +862,29 @@ private fun BrowserRow(
                 color = MaterialTheme.colorScheme.outline,
             )
         }
+        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+            Icon(
+                imageVector = AppIcons.ArrowUp,
+                contentDescription = stringResource(Res.string.move_up),
+                tint = if (canMoveUp) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                },
+            )
+        }
+        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+            Icon(
+                imageVector = AppIcons.ArrowDown,
+                contentDescription = stringResource(Res.string.move_down),
+                tint = if (canMoveDown) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                },
+            )
+        }
+        Spacer(Modifier.width(4.dp))
         Text(
             text = if (isExcluded) {
                 stringResource(Res.string.excludedStr)
