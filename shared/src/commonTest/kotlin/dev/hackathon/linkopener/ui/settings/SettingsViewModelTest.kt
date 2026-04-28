@@ -9,6 +9,7 @@ import dev.hackathon.linkopener.domain.repository.BrowserRepository
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
+import dev.hackathon.linkopener.domain.usecase.GetIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import kotlinx.coroutines.CoroutineScope
@@ -141,6 +142,7 @@ class SettingsViewModelTest {
                 setBrowserExcluded = SetBrowserExcludedUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
+                getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
                 openDefaultBrowserSettings = OpenDefaultBrowserSettingsUseCase(service),
                 getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(service),
                 scope = vmScope,
@@ -159,6 +161,39 @@ class SettingsViewModelTest {
         } finally {
             vmScope.cancel()
         }
+    }
+
+    @Test
+    fun refreshRereadsBrowsersAndDefaultBrowserStatus() = runTest {
+        val service = MutableDefaultBrowserService(initialIsDefault = false)
+        val browserRepo = MutableBrowserRepository(initial = emptyList())
+        val vm = newViewModel(
+            repo = FakeSettingsRepository(),
+            browserRepository = browserRepo,
+            defaultBrowserService = service,
+            scope = this,
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(false, vm.isDefaultBrowser.value)
+        assertEquals(emptyList(), (vm.browsers.value as BrowsersState.Loaded).browsers)
+
+        // Simulate state changing externally — e.g. the user picked a new
+        // default browser and installed an extra browser while Settings was
+        // open. Without manual refresh the one-shot observer flow wouldn't
+        // notice (no live watcher in the fake).
+        service.isDefault = true
+        browserRepo.browsers = listOf(
+            Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", "17.4"),
+        )
+
+        vm.refresh()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(true, vm.isDefaultBrowser.value)
+        assertEquals(
+            listOf(Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", "17.4")),
+            (vm.browsers.value as BrowsersState.Loaded).browsers,
+        )
     }
 
     @Test
@@ -229,6 +264,7 @@ class SettingsViewModelTest {
         setBrowserExcluded = SetBrowserExcludedUseCase(repo),
         discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
         observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(defaultBrowserService),
+        getIsDefaultBrowser = GetIsDefaultBrowserUseCase(defaultBrowserService),
         openDefaultBrowserSettings = OpenDefaultBrowserSettingsUseCase(defaultBrowserService),
         getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(defaultBrowserService),
         scope = scope,
@@ -273,10 +309,27 @@ class SettingsViewModelTest {
 
     private class StaticBrowserRepository(private val browsers: List<Browser>) : BrowserRepository {
         override suspend fun getInstalledBrowsers(): List<Browser> = browsers
+        override suspend fun refresh(): List<Browser> = browsers
+    }
+
+    private class MutableBrowserRepository(initial: List<Browser>) : BrowserRepository {
+        var browsers: List<Browser> = initial
+        override suspend fun getInstalledBrowsers(): List<Browser> = browsers
+        override suspend fun refresh(): List<Browser> = browsers
+    }
+
+    private class MutableDefaultBrowserService(
+        initialIsDefault: Boolean = false,
+    ) : DefaultBrowserService {
+        var isDefault: Boolean = initialIsDefault
+        override val canOpenSystemSettings: Boolean = true
+        override suspend fun isDefaultBrowser(): Boolean = isDefault
+        override suspend fun openSystemSettings(): Boolean = true
     }
 
     private class ThrowingBrowserRepository(private val message: String) : BrowserRepository {
         override suspend fun getInstalledBrowsers(): List<Browser> = error(message)
+        override suspend fun refresh(): List<Browser> = error(message)
     }
 
     private class FakeDefaultBrowserService(

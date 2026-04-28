@@ -87,6 +87,7 @@ import kmp_link_opener.shared.generated.resources.excluded as excludedStr
 import kmp_link_opener.shared.generated.resources.help as helpStr
 import kmp_link_opener.shared.generated.resources.included as includedStr
 import kmp_link_opener.shared.generated.resources.retry as retryStr
+import kmp_link_opener.shared.generated.resources.refresh_action
 import kmp_link_opener.shared.generated.resources.search_browsers
 import kmp_link_opener.shared.generated.resources.section_appearance
 import kmp_link_opener.shared.generated.resources.section_browser_exclusions
@@ -127,6 +128,7 @@ fun SettingsScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
                 appIconPainter = appIconPainter,
+                onRefresh = viewModel::refresh,
                 onCloseRequest = onCloseRequest,
             )
             if (!isDefault) {
@@ -184,6 +186,7 @@ fun SettingsScreen(
 @Composable
 private fun TopAppBar(
     appIconPainter: Painter?,
+    onRefresh: () -> Unit,
     onCloseRequest: () -> Unit,
 ) {
     LocalAppLocale.current  // see LocalAppLocale doc — keeps strings live across language changes
@@ -216,6 +219,13 @@ private fun TopAppBar(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(Modifier.weight(1f))
+            IconButton(onClick = onRefresh) {
+                Icon(
+                    imageVector = AppIcons.Refresh,
+                    contentDescription = stringResource(Res.string.refresh_action),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             IconButton(onClick = { /* TODO: help action */ }) {
                 Icon(
                     imageVector = AppIcons.Help,

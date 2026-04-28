@@ -15,4 +15,8 @@ class BrowserRepositoryImpl(
     override suspend fun getInstalledBrowsers(): List<Browser> = mutex.withLock {
         cached ?: discovery.discover().also { cached = it }
     }
+
+    override suspend fun refresh(): List<Browser> = mutex.withLock {
+        discovery.discover().also { cached = it }
+    }
 }

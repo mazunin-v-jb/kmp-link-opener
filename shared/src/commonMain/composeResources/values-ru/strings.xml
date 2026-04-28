@@ -33,6 +33,7 @@
     <!-- Tray + window -->
     <string name="help">Помощь</string>
     <string name="close">Закрыть</string>
+    <string name="refresh_action">Обновить</string>
     <string name="configure">Настроить</string>
     <string name="tray_menu_settings">Настройки</string>
     <string name="tray_menu_quit">Выход</string>

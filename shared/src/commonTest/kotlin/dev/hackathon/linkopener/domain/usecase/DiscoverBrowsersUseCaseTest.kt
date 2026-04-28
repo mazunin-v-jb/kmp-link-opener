@@ -63,5 +63,6 @@ class DiscoverBrowsersUseCaseTest {
 
     private class FakeRepository(private val value: List<Browser>) : BrowserRepository {
         override suspend fun getInstalledBrowsers(): List<Browser> = value
+        override suspend fun refresh(): List<Browser> = value
     }
 }

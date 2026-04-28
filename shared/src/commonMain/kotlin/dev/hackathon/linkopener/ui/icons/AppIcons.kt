@@ -173,4 +173,21 @@ object AppIcons {
             moveTo(7f, 10f); lineTo(12f, 15f); lineTo(17f, 10f)
         }
     }
+
+    // TODO: replace this hand-rolled placeholder with the final design-system
+    //  refresh glyph once the asset lands. Drawn here only so the Settings
+    //  refresh button has a recognisable shape.
+    val Refresh: ImageVector = line("Refresh") {
+        stroke {
+            // Three-quarter arc of a circle from (12, 4) clockwise around to
+            // the bottom-left, leaving the gap in the upper-right where the
+            // arrowhead sits.
+            moveTo(12f, 4f)
+            arcTo(8f, 8f, 0f, isMoreThanHalf = true, isPositiveArc = false, 4.5f, 14f)
+            // Arrowhead: chevron pointing up-right at the gap, indicating
+            // "rotate clockwise" / refresh.
+            moveTo(12f, 4f); lineTo(15.5f, 4f)
+            moveTo(12f, 4f); lineTo(12f, 7.5f)
+        }
+    }
 }

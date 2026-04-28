@@ -6,6 +6,7 @@ import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
+import dev.hackathon.linkopener.domain.usecase.GetIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
@@ -16,11 +17,9 @@ import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
@@ -31,6 +30,7 @@ class SettingsViewModel(
     private val setBrowserExcluded: SetBrowserExcludedUseCase,
     private val discoverBrowsers: DiscoverBrowsersUseCase,
     observeIsDefaultBrowser: ObserveIsDefaultBrowserUseCase,
+    private val getIsDefaultBrowser: GetIsDefaultBrowserUseCase,
     private val openDefaultBrowserSettings: OpenDefaultBrowserSettingsUseCase,
     getCanOpenSystemSettings: GetCanOpenSystemSettingsUseCase,
     private val scope: CoroutineScope,
@@ -47,18 +47,37 @@ class SettingsViewModel(
     private val _browsers = MutableStateFlow<BrowsersState>(BrowsersState.Loading)
     val browsers: StateFlow<BrowsersState> = _browsers.asStateFlow()
 
+    private val _isDefaultBrowser = MutableStateFlow(false)
+
     // Live binding: macOS overrides DefaultBrowserService.observeIsDefaultBrowser
     // with a WatchService against the LaunchServices preferences plist, so when
     // the user picks a different default in System Settings (or any installer
     // changes the binding) the indicator flips without us polling. Other
     // platforms get a one-shot emission via the interface's default impl until
-    // their service grows a real watcher.
-    val isDefaultBrowser: StateFlow<Boolean> = observeIsDefaultBrowser()
-        .catch { emit(false) }
-        .stateIn(scope, SharingStarted.Eagerly, initialValue = false)
+    // their service grows a real watcher — `refresh()` is the manual escape
+    // hatch that re-reads the value on demand for those platforms.
+    val isDefaultBrowser: StateFlow<Boolean> = _isDefaultBrowser.asStateFlow()
 
     init {
-        refreshBrowsers()
+        scope.launch {
+            observeIsDefaultBrowser()
+                .catch { emit(false) }
+                .collect { _isDefaultBrowser.value = it }
+        }
+        // Initial load reads from BrowserRepository's cache to keep Settings
+        // open instantly — AppContainer's startup warm-up already paid the
+        // discovery cost. Manual refresh() (button / retry) forces re-scan.
+        loadBrowsers(forceRefresh = false)
+        scope.launch {
+            try {
+                _isDefaultBrowser.value = getIsDefaultBrowser()
+            } catch (t: CancellationException) {
+                throw t
+            } catch (_: Throwable) {
+                // Initial read failure: leave default false; the observer
+                // flow will populate later if/when it emits.
+            }
+        }
     }
 
     fun onThemeSelected(theme: AppTheme) {
@@ -84,15 +103,45 @@ class SettingsViewModel(
         scope.launch { setBrowserExcluded(id, excluded) }
     }
 
+    /**
+     * User-triggered re-scan of installed browsers (refresh / retry buttons).
+     * Bypasses the repository cache so a browser installed while Settings
+     * was open shows up on the next click.
+     */
     fun refreshBrowsers() {
+        loadBrowsers(forceRefresh = true)
+    }
+
+    private fun loadBrowsers(forceRefresh: Boolean) {
         scope.launch {
             _browsers.value = BrowsersState.Loading
             try {
-                _browsers.value = BrowsersState.Loaded(discoverBrowsers())
+                _browsers.value = BrowsersState.Loaded(discoverBrowsers(forceRefresh = forceRefresh))
             } catch (t: CancellationException) {
                 throw t
             } catch (t: Throwable) {
                 _browsers.value = BrowsersState.Error(t.message ?: "Browser discovery failed")
+            }
+        }
+    }
+
+    /**
+     * User-triggered refresh from the Settings header. Re-runs browser
+     * discovery (forced) and re-reads the default-browser status — useful on
+     * platforms where [ObserveIsDefaultBrowserUseCase] is one-shot, or as a
+     * manual escape hatch when the WatchService missed an event.
+     */
+    fun refresh() {
+        refreshBrowsers()
+        scope.launch {
+            try {
+                _isDefaultBrowser.value = getIsDefaultBrowser()
+            } catch (t: CancellationException) {
+                throw t
+            } catch (_: Throwable) {
+                // Keep the previous value on read failure rather than flipping
+                // to false — a transient read error shouldn't visually claim
+                // we're no longer the default.
             }
         }
     }

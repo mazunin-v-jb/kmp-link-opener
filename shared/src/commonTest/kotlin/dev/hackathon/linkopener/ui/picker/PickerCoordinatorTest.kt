@@ -189,10 +189,12 @@ class PickerCoordinatorTest {
 
     private class StaticBrowserRepository(private val browsers: List<Browser>) : BrowserRepository {
         override suspend fun getInstalledBrowsers(): List<Browser> = browsers
+        override suspend fun refresh(): List<Browser> = browsers
     }
 
     private class ThrowingBrowserRepository : BrowserRepository {
         override suspend fun getInstalledBrowsers(): List<Browser> = error("discovery failed")
+        override suspend fun refresh(): List<Browser> = error("discovery failed")
     }
 
     private class InMemorySettingsRepository(initial: AppSettings = AppSettings.Default) : SettingsRepository {
