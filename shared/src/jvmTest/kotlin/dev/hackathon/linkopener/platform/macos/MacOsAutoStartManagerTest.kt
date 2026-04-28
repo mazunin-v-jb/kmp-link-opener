@@ -86,6 +86,53 @@ class MacOsAutoStartManagerTest {
         assertTrue(Files.exists(nested.resolve("dev.hackathon.linkopener.test.plist")))
     }
 
+    @Test
+    fun resolvePackagedExecutableFindsLauncherInsideAppBundle() {
+        // jpackage layout: <bundle>.app/Contents/runtime/Contents/Home
+        val appBundle = tmpDir.resolve("Link Opener.app")
+        val javaHome = appBundle.resolve("Contents/runtime/Contents/Home")
+        val macosDir = appBundle.resolve("Contents/MacOS")
+        Files.createDirectories(javaHome)
+        Files.createDirectories(macosDir)
+        val executable = macosDir.resolve("Link Opener")
+        Files.writeString(executable, "#!/bin/sh\necho hi\n")
+
+        val resolved = MacOsAutoStartManager.resolvePackagedExecutable(javaHome)
+
+        assertEquals(executable, resolved)
+    }
+
+    @Test
+    fun resolvePackagedExecutableReturnsNullOutsideBundle() {
+        // A dev JDK install at e.g. ~/Library/Java/.../Contents/Home — no .app
+        // anywhere in the parent chain.
+        val javaHome = tmpDir.resolve("jbr/Contents/Home")
+        Files.createDirectories(javaHome)
+
+        assertEquals(null, MacOsAutoStartManager.resolvePackagedExecutable(javaHome))
+    }
+
+    @Test
+    fun resolvePackagedExecutableReturnsNullWhenMacOsDirIsEmpty() {
+        val appBundle = tmpDir.resolve("Empty.app")
+        val javaHome = appBundle.resolve("Contents/runtime/Contents/Home")
+        Files.createDirectories(javaHome)
+        Files.createDirectories(appBundle.resolve("Contents/MacOS"))
+        // No file inside Contents/MacOS — resolver should bail out.
+
+        assertEquals(null, MacOsAutoStartManager.resolvePackagedExecutable(javaHome))
+    }
+
+    @Test
+    fun resolvePackagedExecutableReturnsNullWhenMacOsDirMissing() {
+        val appBundle = tmpDir.resolve("Broken.app")
+        val javaHome = appBundle.resolve("Contents/runtime/Contents/Home")
+        Files.createDirectories(javaHome)
+        // No Contents/MacOS dir at all.
+
+        assertEquals(null, MacOsAutoStartManager.resolvePackagedExecutable(javaHome))
+    }
+
     private fun newManager(executable: String = "/usr/bin/java"): MacOsAutoStartManager =
         MacOsAutoStartManager(
             launchAgentDir = tmpDir,

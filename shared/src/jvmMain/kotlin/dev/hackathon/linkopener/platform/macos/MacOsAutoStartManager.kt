@@ -40,13 +40,32 @@ class MacOsAutoStartManager(
         private fun defaultLaunchAgentDir(): Path =
             Paths.get(System.getProperty("user.home"), "Library", "LaunchAgents")
 
-        // TODO: when running from a packaged .app bundle, replace this with the
-        //  bundle's MacOS executable path. The current best-effort path works
-        //  in dev (gradle :desktopApp:run) but won't auto-start a real app
-        //  until packaging lands. Tracked under stage 4 acceptance notes.
         private fun defaultExecutablePath(): String {
-            val javaHome = System.getProperty("java.home")
-            return Paths.get(javaHome, "bin", "java").toString()
+            val javaHome = Paths.get(System.getProperty("java.home").orEmpty())
+            return resolvePackagedExecutable(javaHome)?.toString()
+                // Dev mode (gradle :desktopApp:run) — `RunAtLoad` against a JDK
+                // executable obviously won't relaunch the gradle worker, but
+                // having *something* in the plist at least keeps the toggle
+                // round-trip observable for testing.
+                ?: javaHome.resolve("bin").resolve("java").toString()
+        }
+
+        /**
+         * If [javaHome] points inside a jpackage-style macOS bundle
+         * (`<name>.app/Contents/runtime/Contents/Home`), returns the bundle's
+         * launcher binary at `Contents/MacOS/<name>`. Returns `null` when the
+         * JVM is running outside a packaged app (dev / unit tests / a
+         * non-`.app` JDK). Visible for testing.
+         */
+        internal fun resolvePackagedExecutable(javaHome: Path): Path? {
+            val appBundle = javaHome.parent?.parent?.parent?.parent ?: return null
+            if (appBundle.fileName?.toString()?.endsWith(".app") != true) return null
+            val macosDir = appBundle.resolve("Contents").resolve("MacOS")
+            return runCatching {
+                Files.list(macosDir).use { stream ->
+                    stream.filter { Files.isRegularFile(it) }.findFirst().orElse(null)
+                }
+            }.getOrNull()
         }
 
         internal fun buildPlistXml(label: String, executable: String): String =
