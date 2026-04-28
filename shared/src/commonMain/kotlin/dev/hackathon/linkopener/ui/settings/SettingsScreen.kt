@@ -36,6 +36,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,7 @@ import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.icons.AppIcons
+import dev.hackathon.linkopener.ui.strings.LocalAppLocale
 import dev.hackathon.linkopener.ui.strings.defaultBrowserInstructions
 import dev.hackathon.linkopener.ui.strings.languageLabel
 import dev.hackathon.linkopener.ui.strings.themeLabel
@@ -112,6 +114,11 @@ fun SettingsScreen(
     val isDefault by viewModel.isDefaultBrowser.collectAsState()
     var activeSection by remember { mutableStateOf(NavSection.DefaultBrowser) }
 
+    // Provide a locale nonce so children that don't take any settings-derived
+    // parameter still recompose when the user switches language — without it
+    // Compose's smart-skipping leaves TopAppBar / Sidebar / banner stuck on
+    // the previous locale until something else invalidates them.
+    CompositionLocalProvider(LocalAppLocale provides settings.language.name) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -168,6 +175,7 @@ fun SettingsScreen(
             }
         }
     }
+    }
 }
 
 // region top bar + banner
@@ -177,6 +185,7 @@ private fun TopAppBar(
     appIconPainter: Painter?,
     onCloseRequest: () -> Unit,
 ) {
+    LocalAppLocale.current  // see LocalAppLocale doc — keeps strings live across language changes
     val appName = stringResource(Res.string.app_name)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -230,6 +239,7 @@ private fun NotDefaultBanner(
     onOpenSettings: () -> Unit,
     onSelectDefaultSection: () -> Unit,
 ) {
+    LocalAppLocale.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.errorContainer,
@@ -299,6 +309,7 @@ private fun Sidebar(
     activeSection: NavSection,
     onSelect: (NavSection) -> Unit,
 ) {
+    LocalAppLocale.current
     Surface(
         modifier = Modifier
             .width(240.dp)
