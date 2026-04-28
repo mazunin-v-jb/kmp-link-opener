@@ -39,6 +39,7 @@ Recent additions worth knowing about for context:
 - **Placeholder icons:** mark with `TODO` and call out in chat. Stage 4.5 replaced the original placeholder with `app_icon.png`; the tray loader is in `desktopApp/.../tray/TrayIconLoader.kt`.
 - **Sensitive data — STOP AND ASK.** Signing identities, app-specific passwords, etc. live in `~/.gradle/gradle.properties` (outside the repo). The notarization keychain profile is created once via `xcrun notarytool store-credentials` and referenced by name only. Never commit secrets.
 - For each new stage, create `ai_stages/<NN>_<name>/plan.md` describing the implementation in detail before coding.
+- **Bump version before push to `main`.** Increment the patch component of `linkopener.version` in root `gradle.properties` (e.g. `1.0.0` → `1.0.1`). It is the single source of truth — fed into both the DMG packaging metadata (`composePackageVersion`) and the runtime `AppInfo.version` shown in Settings. Format: `MAJOR.MINOR.PATCH` with `MAJOR ≥ 1` (the DMG packager rejects `0.x.y`).
 
 ## Build & test commands
 
@@ -138,7 +139,7 @@ Other notable deps: `kotlinx-coroutines` (with `kotlinx-coroutines-swing` for th
 
 ## Native distributables (macOS specifics)
 
-- `compose.desktop.application.nativeDistributions.packageVersion` must be `MAJOR.MINOR.PATCH` with `MAJOR > 0` (the DMG packager rejects `0.x.y`). The internal `AppInfo` version (returned by `GetAppInfoUseCase`) is independent of the packaging version and can stay at `0.1.0`.
+- Both `compose.desktop.application.nativeDistributions.packageVersion` (DMG metadata) and the runtime `AppInfo.version` (shown in Settings) read from a single source: `linkopener.version` in root `gradle.properties`. `:shared` has a `generateBuildVersion` task that emits `dev/hackathon/linkopener/BuildVersion.kt` with that value, which `AppInfoRepositoryImpl` consumes. Format must be `MAJOR.MINOR.PATCH` with `MAJOR ≥ 1` — the DMG packager rejects `0.x.y`.
 - Bundle id is `dev.hackathon.linkopener` and is duplicated in two places — `desktopApp/build.gradle.kts` (`nativeDistributions.macOS.bundleID`) and `AppContainer.ownBundleId`. Keep them in sync; the latter is used both to filter ourselves out of the picker and to recognize ourselves in the LaunchServices plist.
 - `Info.plist` extras (declared via `extraKeysRawXml`):
   - `CFBundleURLTypes` for `http`/`https` with `LSHandlerRank=Default`,

@@ -7,11 +7,20 @@ import kotlin.test.assertTrue
 class AppInfoRepositoryImplTest {
 
     @Test
-    fun returnsHardcodedAppInfo() {
+    fun returnsHardcodedNameAndGeneratedVersion() {
         val info = AppInfoRepositoryImpl().getAppInfo()
 
         assertEquals("Link Opener", info.name)
-        assertEquals("0.1.0", info.version)
+        // Don't assert a literal value here — the version is generated from
+        // root `gradle.properties` via the :shared `generateBuildVersion`
+        // task. Bumping the property shouldn't break this test. We only check
+        // the shape (MAJOR.MINOR.PATCH with MAJOR ≥ 1, the DMG-packager
+        // constraint also documented in CLAUDE.md).
+        val semverWithMajorAtLeastOne = Regex("^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$")
+        assertTrue(
+            info.version.matches(semverWithMajorAtLeastOne),
+            "version '${info.version}' does not match MAJOR.MINOR.PATCH with MAJOR ≥ 1",
+        )
     }
 
     @Test

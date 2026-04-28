@@ -34,7 +34,10 @@ kotlin {
 }
 
 val composePackageName = "Link Opener"
-val composePackageVersion = "1.0.0"
+// Single source of truth: `linkopener.version` in root gradle.properties.
+// Consumed here (DMG metadata) and in :shared (generates BuildVersion.kt
+// for the Settings UI). Bump before pushing to main.
+val composePackageVersion: String = providers.gradleProperty("linkopener.version").get()
 val signingIdentity: String? = findProperty("macos.signing.identity") as String?
 val notarizationProfile: String? = findProperty("macos.notarization.profile") as String?
 
