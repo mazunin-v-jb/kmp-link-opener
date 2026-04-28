@@ -148,6 +148,33 @@ class SettingsViewModelTest {
         assertTrue(!vm.canOpenSystemSettings)
     }
 
+    @Test
+    fun onBrowserExclusionToggledExcludesBrowser() = runTest {
+        val repo = FakeSettingsRepository()
+        val vm = newViewModel(repo = repo, scope = this)
+        val id = BrowserId("com.apple.Safari")
+
+        vm.onBrowserExclusionToggled(id, excluded = true)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(setOf(id), vm.settings.value.excludedBrowserIds)
+    }
+
+    @Test
+    fun onBrowserExclusionToggledRemovesBrowser() = runTest {
+        val repo = FakeSettingsRepository()
+        val vm = newViewModel(repo = repo, scope = this)
+        val id = BrowserId("com.google.Chrome")
+        vm.onBrowserExclusionToggled(id, excluded = true)
+        testScheduler.advanceUntilIdle()
+        assertEquals(setOf(id), vm.settings.value.excludedBrowserIds)
+
+        vm.onBrowserExclusionToggled(id, excluded = false)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptySet(), vm.settings.value.excludedBrowserIds)
+    }
+
     private fun newViewModel(
         repo: SettingsRepository,
         scope: TestScope,

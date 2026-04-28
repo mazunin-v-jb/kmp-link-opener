@@ -177,4 +177,87 @@ class PlistJsonParserTest {
 
         assertNull(browser)
     }
+
+    @Test
+    fun returnsNullWhenUrlTypesIsNotAnArray() {
+        // Defensive: if CFBundleURLTypes is a string (malformed plist), treat it as
+        // "no URL types" and skip.
+        val json = """
+            {
+              "CFBundleIdentifier": "com.example.malformed",
+              "CFBundleName": "Malformed",
+              "CFBundleURLTypes": "this should be an array"
+            }
+        """.trimIndent()
+
+        val browser = parser.parseBrowser(json, Path("/Applications/Malformed.app"))
+
+        assertNull(browser)
+    }
+
+    @Test
+    fun skipsUrlTypeEntriesThatAreNotDicts() {
+        // First entry is a stray string (skipped), second is a real dict declaring http.
+        val json = """
+            {
+              "CFBundleIdentifier": "com.example.mixed",
+              "CFBundleName": "Mixed",
+              "CFBundleURLTypes": [
+                "ignore-me",
+                {
+                  "CFBundleURLSchemes": ["http"]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val browser = parser.parseBrowser(json, Path("/Applications/Mixed.app"))
+
+        assertNotNull(browser)
+        assertEquals("com.example.mixed", browser.bundleId)
+    }
+
+    @Test
+    fun skipsUrlTypeWhenSchemesIsNotAnArray() {
+        // CFBundleURLSchemes is a string, not an array — should be skipped, and since
+        // no other entry declares http, we return null.
+        val json = """
+            {
+              "CFBundleIdentifier": "com.example.noschemes",
+              "CFBundleName": "No Schemes",
+              "CFBundleURLTypes": [
+                {
+                  "CFBundleURLName": "Stub",
+                  "CFBundleURLSchemes": "http"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val browser = parser.parseBrowser(json, Path("/Applications/No Schemes.app"))
+
+        assertNull(browser)
+    }
+
+    @Test
+    fun skipsNonStringSchemeEntries() {
+        // CFBundleURLSchemes contains a number alongside the http string. The number
+        // entry must be skipped without throwing; the http entry still qualifies.
+        val json = """
+            {
+              "CFBundleIdentifier": "com.example.numeric",
+              "CFBundleName": "Numeric",
+              "CFBundleURLTypes": [
+                {
+                  "CFBundleURLSchemes": [42, "http"]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val browser = parser.parseBrowser(json, Path("/Applications/Numeric.app"))
+
+        assertNotNull(browser)
+        assertEquals("com.example.numeric", browser.bundleId)
+    }
 }

@@ -44,6 +44,7 @@ kover {
                 classes(
                     "dev.hackathon.linkopener.ui.icons.**",
                     "dev.hackathon.linkopener.ui.settings.SettingsScreen*",
+                    "dev.hackathon.linkopener.ui.settings.NavSection*",
                     "dev.hackathon.linkopener.ui.theme.LinkOpenerTheme*",
                     "dev.hackathon.linkopener.ui.theme.LinkOpenerColors*",
                     "dev.hackathon.linkopener.ui.theme.LinkOpenerTypography*",
