@@ -35,6 +35,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -107,6 +111,19 @@ class AppContainer {
         launcher = linkLauncher,
         scope = coroutineScope,
     )
+
+    // Activation requests come from SingleInstanceGuard's listener thread when
+    // a second copy of the app is launched. TrayHost subscribes and decides
+    // whether to open Settings or just nudge the already-open window.
+    private val _activationRequests = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val activationRequests: SharedFlow<Unit> = _activationRequests.asSharedFlow()
+
+    fun requestActivation() {
+        _activationRequests.tryEmit(Unit)
+    }
 
     init {
         // Apply the loaded language's locale to the JVM immediately, before
