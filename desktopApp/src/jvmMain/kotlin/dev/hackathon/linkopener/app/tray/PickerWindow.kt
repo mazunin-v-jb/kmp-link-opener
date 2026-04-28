@@ -1,5 +1,6 @@
 package dev.hackathon.linkopener.app.tray
 
+import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
@@ -71,6 +72,11 @@ fun ApplicationScope.PickerWindow(
             url = url,
             browsers = browsers,
             onPick = onPick,
+            // Header doubles as a drag handle so users can reposition the
+            // popup without a title bar (we run undecorated). WindowDraggableArea
+            // is a WindowScope extension, so resolution depends on this lambda
+            // being defined inside the Window {} block — which it is.
+            headerWrapper = { content -> WindowDraggableArea { content() } },
         )
     }
 }

@@ -1,5 +1,6 @@
 package dev.hackathon.linkopener.ui.picker
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,12 +9,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,15 +49,19 @@ import org.jetbrains.compose.resources.stringResource
 
 private const val DEFAULT_VISIBLE_COUNT = 3
 
+// Each BrowserRow is icon-bound (32dp icon + 10dp top + 10dp bottom padding = 52dp),
+// so we can cap the expanded scroll viewport at 3 * 52dp without measuring.
+private val ROW_HEIGHT = 52.dp
+private val EXPANDED_SCROLL_MAX_HEIGHT = ROW_HEIGHT * DEFAULT_VISIBLE_COUNT
+
 @Composable
 fun BrowserPickerScreen(
     url: String,
     browsers: List<Browser>,
     onPick: (Browser) -> Unit,
+    headerWrapper: @Composable (content: @Composable () -> Unit) -> Unit = { it() },
 ) {
     var expanded by remember(browsers) { mutableStateOf(false) }
-    val visible = if (expanded || browsers.size <= DEFAULT_VISIBLE_COUNT) browsers
-    else browsers.take(DEFAULT_VISIBLE_COUNT)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -65,15 +75,22 @@ fun BrowserPickerScreen(
         ),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Header(url = url)
+            headerWrapper {
+                Header(url = url)
+            }
 
             if (browsers.isEmpty()) {
                 EmptyState()
+            } else if (expanded) {
+                ScrollableBrowserList(
+                    browsers = browsers,
+                    onPick = onPick,
+                )
             } else {
-                visible.forEach { browser ->
+                browsers.take(DEFAULT_VISIBLE_COUNT).forEach { browser ->
                     BrowserRow(browser = browser, onClick = { onPick(browser) })
                 }
-                if (!expanded && browsers.size > DEFAULT_VISIBLE_COUNT) {
+                if (browsers.size > DEFAULT_VISIBLE_COUNT) {
                     ShowAllButton(
                         label = "${stringResource(Res.string.picker_show_all)} (${browsers.size})",
                         onClick = { expanded = true },
@@ -81,6 +98,31 @@ fun BrowserPickerScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ScrollableBrowserList(
+    browsers: List<Browser>,
+    onPick: (Browser) -> Unit,
+) {
+    val scrollState = rememberScrollState()
+    Box(modifier = Modifier.heightIn(max = EXPANDED_SCROLL_MAX_HEIGHT)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState),
+        ) {
+            browsers.forEach { browser ->
+                BrowserRow(browser = browser, onClick = { onPick(browser) })
+            }
+        }
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight(),
+        )
     }
 }
 
