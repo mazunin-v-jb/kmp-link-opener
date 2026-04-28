@@ -3,6 +3,7 @@ package dev.hackathon.linkopener.ui.picker
 import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.domain.repository.BrowserRepository
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
@@ -46,7 +47,7 @@ class PickerCoordinatorTest {
 
     @Test
     fun excludedBrowsersAreFilteredOut() = runTest {
-        val settings = AppSettings(excludedBrowserIds = setOf(BrowserId("com.google.Chrome")))
+        val settings = AppSettings(excludedBrowserIds = setOf(chrome.toBrowserId()))
         val coord = newCoordinator(
             scope = this,
             browsers = listOf(safari, chrome, firefox),
@@ -59,6 +60,26 @@ class PickerCoordinatorTest {
         val state = coord.state.value
         assertIs<PickerState.Showing>(state)
         assertEquals(listOf(safari, firefox), state.browsers)
+    }
+
+    @Test
+    fun excludingOneInstallationKeepsAnotherWithSameBundleId() = runTest {
+        // Two installs of Chrome (parallel versions) share a bundleId but live
+        // at different paths; excluding one must not exclude the other.
+        val chrome2 = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome 2.app", "126")
+        val settings = AppSettings(excludedBrowserIds = setOf(chrome.toBrowserId()))
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(chrome, chrome2),
+            settings = settings,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        val state = coord.state.value
+        assertIs<PickerState.Showing>(state)
+        assertEquals(listOf(chrome2), state.browsers)
     }
 
     @Test

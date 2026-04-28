@@ -55,6 +55,7 @@ import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.icons.AppIcons
 import dev.hackathon.linkopener.ui.strings.LocalAppLocale
@@ -773,7 +774,7 @@ private fun BrowserList(
                 ),
         ) {
             visible.forEachIndexed { index, browser ->
-                val id = BrowserId(browser.bundleId)
+                val id = browser.toBrowserId()
                 BrowserRow(
                     browser = browser,
                     isExcluded = id in excluded,

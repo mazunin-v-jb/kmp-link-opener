@@ -1,7 +1,7 @@
 package dev.hackathon.linkopener.ui.picker
 
 import dev.hackathon.linkopener.core.model.Browser
-import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.platform.LinkLauncher
@@ -26,7 +26,7 @@ class PickerCoordinator(
             try {
                 val all = discoverBrowsers()
                 val excluded = getSettings().value.excludedBrowserIds
-                val available = all.filterNot { BrowserId(it.bundleId) in excluded }
+                val available = all.filterNot { it.toBrowserId() in excluded }
                 _state.value = PickerState.Showing(url = url, browsers = available)
             } catch (t: CancellationException) {
                 throw t
