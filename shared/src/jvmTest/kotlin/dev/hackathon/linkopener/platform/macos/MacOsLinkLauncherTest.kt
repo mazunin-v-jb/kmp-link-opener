@@ -101,6 +101,67 @@ class MacOsLinkLauncherTest {
     }
 
     @Test
+    fun chromiumProfileSwitchesToArgsWithProfileDirectory() = runTest {
+        // Stage 046: when the browser carries a profile and is Chromium-family,
+        // `--args --profile-directory=<id>` must replace the bare `-- <url>`.
+        val captured = mutableListOf<List<String>>()
+        val launcher = MacOsLinkLauncher(processFactory = { args ->
+            captured.add(args)
+            FakeProcess(exitCode = 0)
+        })
+        val chrome = dev.hackathon.linkopener.core.model.Browser(
+            bundleId = "com.google.Chrome",
+            displayName = "Google Chrome",
+            applicationPath = "/Applications/Google Chrome.app",
+            version = "131.0",
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile(
+                id = "Profile 1",
+                displayName = "Work",
+            ),
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Chromium,
+        )
+
+        launcher.openIn(chrome, "https://example.com/?q=1")
+
+        assertEquals(
+            listOf(
+                // -na (new instance) is required so Chrome processes URL +
+                // profile flag together; without -n, an already-running
+                // Chrome receives only the URL (via Apple Event) and the
+                // profile flag separately, dropping the URL.
+                "open", "-na", "/Applications/Google Chrome.app",
+                "--args", "--profile-directory=Profile 1",
+                "https://example.com/?q=1",
+            ),
+            captured.single(),
+        )
+    }
+
+    @Test
+    fun profileWithNonChromiumFamilyFallsBackToOpenA() = runTest {
+        // Defensive: profile is set but family is Other (shouldn't happen
+        // through real discovery, but if some manual flow ever produces this
+        // shape we don't want to silently invoke unknown CLI flags on Safari).
+        val captured = mutableListOf<List<String>>()
+        val launcher = MacOsLinkLauncher(processFactory = { args ->
+            captured.add(args)
+            FakeProcess(exitCode = 0)
+        })
+        val odd = safari.copy(
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile("X", "Y"),
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Other,
+        )
+
+        launcher.openIn(odd, "https://example.com")
+
+        // Plain `open -a <path> -- <url>` form, no `--args`.
+        assertEquals(
+            listOf("open", "-a", safari.applicationPath, "--", "https://example.com"),
+            captured.single(),
+        )
+    }
+
+    @Test
     fun urlSpecialCharactersArePassedThroughVerbatim() = runTest {
         val captured = mutableListOf<List<String>>()
         val launcher = MacOsLinkLauncher(processFactory = { args ->

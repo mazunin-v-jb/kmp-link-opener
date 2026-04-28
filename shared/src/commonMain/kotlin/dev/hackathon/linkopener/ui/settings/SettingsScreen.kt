@@ -62,6 +62,7 @@ import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.core.model.UrlRule
 import dev.hackathon.linkopener.core.model.toBrowserId
+import dev.hackathon.linkopener.core.model.uiLabel
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.icons.AppIcons
 import dev.hackathon.linkopener.ui.strings.LocalAppLocale
@@ -881,7 +882,7 @@ private fun BrowserList(
     var query by remember { mutableStateOf("") }
     val visible = remember(query, browsers) {
         if (query.isBlank()) browsers
-        else browsers.filter { it.displayName.contains(query, ignoreCase = true) }
+        else browsers.filter { it.uiLabel.contains(query, ignoreCase = true) }
     }
     // Up/down operate on the unfiltered ordered list — searching narrows the
     // visible rows but reorder buttons still walk the full list, so disable
@@ -994,7 +995,7 @@ private fun BrowserRow(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = browser.displayName + (browser.version?.let { " $it" } ?: ""),
+                text = browser.uiLabel + (browser.version?.let { " $it" } ?: ""),
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -1246,7 +1247,7 @@ private fun BrowserDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val currentBrowser = options.firstOrNull { it.toBrowserId() == current }
-    val label = currentBrowser?.displayName ?: current.value.substringAfterLast('/')
+    val label = currentBrowser?.uiLabel ?: current.value.substringAfterLast('/')
     Box(modifier = modifier) {
         OutlinedButton(
             onClick = { expanded = true },
@@ -1272,7 +1273,7 @@ private fun BrowserDropdown(
         ) {
             options.forEach { browser ->
                 DropdownMenuItem(
-                    text = { Text(browser.displayName) },
+                    text = { Text(browser.uiLabel) },
                     onClick = {
                         onSelected(browser.toBrowserId())
                         expanded = false

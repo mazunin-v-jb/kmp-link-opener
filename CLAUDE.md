@@ -18,6 +18,7 @@ Status as of latest main:
 | 4.1 | Default-browser detection + System Settings deep-link | ✅ (live via WatchService → `Flow<Boolean>`) |
 | 4.2 | Browser picker popup window | ✅ (drag handle + scrolling expanded list + dismiss-outside) |
 | 4.3 | Manual browser addition (file picker → `Info.plist` → settings.manualBrowsers, merged into discovered list and picker) | ✅ |
+| 4.6 | Chromium browser profile detection (per-profile rows in Settings + picker, `--profile-directory=...` launcher flag) | ✅ |
 | 4.5 | Design system (colors, typography, icons, theme) | ✅ |
 | 5 | i18n via Compose Resources XML + JVM-locale override | ✅ |
 | 6 | Custom URL → browser rules (host-glob, first-match-wins, integrated into picker flow) | ✅ |

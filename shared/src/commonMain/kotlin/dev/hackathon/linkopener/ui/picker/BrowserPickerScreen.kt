@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.hackathon.linkopener.core.model.Browser
+import dev.hackathon.linkopener.core.model.uiLabel
 import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLow
 import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLow
@@ -181,7 +182,7 @@ private fun BrowserRow(browser: Browser, onClick: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = browser.displayName,
+                text = browser.uiLabel,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,

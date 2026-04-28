@@ -14,6 +14,7 @@
 > | 4.1 | Детекция default-browser (live через WatchService) + deep-link в System Settings + переписанный сайдбар | ✅ |
 > | 4.2 | Browser picker popup (3 + «Show all», drag, scroll, dismiss-outside) | ✅ |
 > | 4.3 | Ручное добавление браузеров через native file picker | ✅ |
+> | 4.6 | Chromium профили (Local State → per-profile записи + `--profile-directory=…` в launcher) | ✅ |
 > | 4.5 | Дизайн-система (M3 colors / typography / brand-icon) | ✅ |
 > | 5 | i18n через Compose Resources XML + locale-flip на click thread | ✅ |
 > | 6 | Custom URL → browser rules (host-glob, first-match-wins, picker integration) | ✅ |

@@ -1,11 +1,14 @@
 package dev.hackathon.linkopener.platform.macos
 
 import dev.hackathon.linkopener.core.model.Browser
+import dev.hackathon.linkopener.core.model.BrowserFamily
+import dev.hackathon.linkopener.core.model.BrowserProfile
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MacOsBrowserDiscoveryTest {
@@ -173,17 +176,130 @@ class MacOsBrowserDiscoveryTest {
         assertTrue(result.none { it.applicationPath.endsWith("B.app") })
     }
 
+    // ---------- Stage 046: profile expansion ----------
+
+    @Test
+    fun chromiumWithMultipleProfilesIsExpandedIntoOnePerProfile() = runTest {
+        val chromePath = Path("/fake/Google Chrome.app")
+        val discovery = newDiscovery(
+            roots = listOf(Path("/fake")),
+            scanner = constantScanner(chromePath),
+            reader = readerThat { browser("com.google.Chrome", "Google Chrome", it) },
+            profileScanner = scannerThatReturns(
+                BrowserProfile("Default", "Personal"),
+                BrowserProfile("Profile 1", "Work"),
+            ),
+        )
+
+        val result = discovery.discover()
+
+        assertEquals(2, result.size)
+        // Both rows reference the same parent .app, but different profiles.
+        assertTrue(result.all { it.applicationPath == chromePath.toString() })
+        assertTrue(result.all { it.family == BrowserFamily.Chromium })
+        assertEquals(setOf("Default", "Profile 1"), result.map { it.profile?.id }.toSet())
+        assertEquals(setOf("Personal", "Work"), result.map { it.profile?.displayName }.toSet())
+    }
+
+    @Test
+    fun chromiumWithSingleProfileEmitsOneRecordWithoutProfile() = runTest {
+        // Per stage-046 plan Q2: don't dilute the list with a synthetic
+        // "Default" entry when only one profile exists.
+        val chromePath = Path("/fake/Google Chrome.app")
+        val discovery = newDiscovery(
+            roots = listOf(Path("/fake")),
+            scanner = constantScanner(chromePath),
+            reader = readerThat { browser("com.google.Chrome", "Google Chrome", it) },
+            profileScanner = scannerThatReturns(BrowserProfile("Default", "Vlad")),
+        )
+
+        val result = discovery.discover()
+
+        assertEquals(1, result.size)
+        assertNull(result[0].profile)
+        assertEquals(BrowserFamily.Chromium, result[0].family)
+    }
+
+    @Test
+    fun chromiumWithNoProfilesEmitsOneRecordWithoutProfile() = runTest {
+        // Browser was never opened — Local State doesn't exist.
+        val chromePath = Path("/fake/Google Chrome.app")
+        val discovery = newDiscovery(
+            roots = listOf(Path("/fake")),
+            scanner = constantScanner(chromePath),
+            reader = readerThat { browser("com.google.Chrome", "Google Chrome", it) },
+            profileScanner = scannerThatReturns(),
+        )
+
+        val result = discovery.discover()
+
+        assertEquals(1, result.size)
+        assertNull(result[0].profile)
+        assertEquals(BrowserFamily.Chromium, result[0].family)
+    }
+
+    @Test
+    fun nonChromiumBrowsersAreNotExpandedAndGetOtherFamily() = runTest {
+        // Safari (or any unknown) — no profile detection attempted.
+        val safariPath = Path("/fake/Safari.app")
+        val discovery = newDiscovery(
+            roots = listOf(Path("/fake")),
+            scanner = constantScanner(safariPath),
+            reader = readerThat { browser("com.apple.Safari", "Safari", it) },
+            profileScanner = scannerThatThrows(), // must not be called
+        )
+
+        val result = discovery.discover()
+
+        assertEquals(1, result.size)
+        assertNull(result[0].profile)
+        assertEquals(BrowserFamily.Safari, result[0].family)
+    }
+
+    @Test
+    fun unknownBundleIdGetsOtherFamilyAndNoProfileExpansion() = runTest {
+        val customPath = Path("/fake/Custom.app")
+        val discovery = newDiscovery(
+            roots = listOf(Path("/fake")),
+            scanner = constantScanner(customPath),
+            reader = readerThat { browser("com.example.unknown", "Custom", it) },
+            profileScanner = scannerThatThrows(),
+        )
+
+        val result = discovery.discover()
+
+        assertEquals(1, result.size)
+        assertNull(result[0].profile)
+        assertEquals(BrowserFamily.Other, result[0].family)
+    }
+
     // --- helpers ---
 
     private fun newDiscovery(
         roots: List<Path>,
         scanner: AppBundleScanner = scannerThat { emptyList() },
         reader: InfoPlistReader = readerThat { null },
+        profileScanner: ChromiumProfileScanner = scannerThatReturns(),
     ): MacOsBrowserDiscovery = MacOsBrowserDiscovery(
         scanner = scanner,
         plistReader = reader,
         searchRoots = roots,
+        profileScanner = profileScanner,
+        // Tests never read real `~/Library/Application Support/` — feed a
+        // fake root that the fake profileScanner ignores anyway.
+        applicationSupportDir = Path("/tmp/fake-app-support-${System.nanoTime()}"),
     )
+
+    private fun scannerThatReturns(vararg profiles: BrowserProfile): ChromiumProfileScanner =
+        object : ChromiumProfileScanner() {
+            override fun scan(userDataDir: Path): List<BrowserProfile> = profiles.toList()
+        }
+
+    private fun scannerThatThrows(): ChromiumProfileScanner =
+        object : ChromiumProfileScanner() {
+            override fun scan(userDataDir: Path): List<BrowserProfile> =
+                error("profile scanner should not be called for non-Chromium browser")
+        }
 
     private fun scannerThat(block: (Path) -> List<Path>): AppBundleScanner =
         object : AppBundleScanner() {
