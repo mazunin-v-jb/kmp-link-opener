@@ -74,7 +74,26 @@ KMP test tasks are named after the target — `:shared:test` does **not** exist;
 
 ## Debug logging
 
-`AppContainer` does a warm-up `DiscoverBrowsersUseCase()` at startup so the picker is instant on first invocation; the result is cached in `BrowserRepositoryImpl`. The discovery dump (`Discovered N browser(s): …`) only prints when `-Dlinkopener.debug=true` is on the JVM args. Add it to the IDE run config, or pass via `./gradlew :desktopApp:run -Dlinkopener.debug=true` (or `JAVA_OPTS`/`-X` flags when launching the packaged `.app`). Errors surface to stderr regardless.
+The `linkopener.debug` system property toggles development conveniences. Set `-Dlinkopener.debug=true` on the JVM args to enable; without the flag (default for stamped public builds) all of these are silent / hidden.
+
+What it currently gates:
+- **Startup discovery dump.** `AppContainer` does a warm-up `DiscoverBrowsersUseCase()` so the picker is instant on first invocation; the result is cached in `BrowserRepositoryImpl`. With debug on, the dump (`Discovered N browser(s): …`) prints to stdout. Errors surface to stderr regardless.
+- **"Test picker (dev)" tray menu item.** Spawns the picker against `https://example.com/?utm=picker-test` so the picker chain can be exercised without packaging + registering the app as default browser. Hidden in non-debug builds (TD-7).
+
+Three ways to set the flag:
+
+```bash
+# 1. Gradle run task (development)
+./gradlew :desktopApp:run -Dlinkopener.debug=true
+
+# 2. IDE run config — add to "VM options"
+-Dlinkopener.debug=true
+
+# 3. Launching a packaged .app from terminal (logs land in your shell)
+_JAVA_OPTIONS="-Dlinkopener.debug=true" "/Applications/Link Opener.app/Contents/MacOS/Link Opener"
+```
+
+The `_JAVA_OPTIONS` form is the only way to flip the flag on an already-installed `.app` without rebuilding — the bundled JRE picks it up at startup. JVM will print a one-time `Picked up _JAVA_OPTIONS: …` line; that's normal.
 
 ## Dev cycle for testing as the default browser
 
