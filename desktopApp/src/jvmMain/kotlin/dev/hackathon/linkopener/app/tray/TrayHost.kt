@@ -67,6 +67,7 @@ fun ApplicationScope.TrayHost(
                     viewModel = settingsViewModel,
                     strings = strings,
                     appVersion = appInfo.version,
+                    currentOs = container.currentOs,
                     appIconPainter = appIconPainter,
                     onCloseRequest = { settingsAnchor = null },
                 )

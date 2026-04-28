@@ -1,5 +1,6 @@
 package dev.hackathon.linkopener.ui.settings
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -39,11 +41,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
@@ -54,7 +54,9 @@ import androidx.compose.ui.unit.sp
 import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
+import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.icons.AppIcons
 import dev.hackathon.linkopener.ui.strings.Strings
 import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLow
@@ -62,22 +64,22 @@ import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLow
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LocalIsDarkMode
-import kotlinx.coroutines.launch
 
-private enum class NavSection { Appearance, Language, System, Exclusions }
+private enum class NavSection { DefaultBrowser, Appearance, Language, System, Exclusions }
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     strings: Strings,
     appVersion: String,
+    currentOs: HostOs,
     appIconPainter: Painter? = null,
     onCloseRequest: () -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsState()
-    var activeSection by remember { mutableStateOf(NavSection.Appearance) }
-    val lazyState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
+    val browsers by viewModel.browsers.collectAsState()
+    val isDefault by viewModel.isDefaultBrowser.collectAsState()
+    var activeSection by remember { mutableStateOf(NavSection.DefaultBrowser) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -89,31 +91,54 @@ fun SettingsScreen(
                 appIconPainter = appIconPainter,
                 onCloseRequest = onCloseRequest,
             )
+            if (!isDefault) {
+                NotDefaultBanner(
+                    strings = strings,
+                    canOpenSettings = viewModel.canOpenSystemSettings,
+                    onOpenSettings = viewModel::openSystemSettings,
+                    onSelectDefaultSection = { activeSection = NavSection.DefaultBrowser },
+                )
+            }
             Row(modifier = Modifier.fillMaxSize()) {
                 Sidebar(
                     strings = strings,
                     appVersion = appVersion,
                     activeSection = activeSection,
-                    onSelect = { section ->
-                        activeSection = section
-                        scope.launch {
-                            lazyState.animateScrollToItem(NavSection.entries.indexOf(section))
+                    onSelect = { activeSection = it },
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    Crossfade(targetState = activeSection) { section ->
+                        when (section) {
+                            NavSection.DefaultBrowser -> DefaultBrowserSection(
+                                strings = strings,
+                                currentOs = currentOs,
+                                isDefault = isDefault,
+                                canOpenSettings = viewModel.canOpenSystemSettings,
+                                onOpenSettings = viewModel::openSystemSettings,
+                            )
+                            NavSection.Appearance -> AppearanceSection(strings, settings.theme, viewModel::onThemeSelected)
+                            NavSection.Language -> LanguageSection(strings, settings.language, viewModel::onLanguageSelected)
+                            NavSection.System -> SystemSection(strings, settings.autoStartEnabled, viewModel::onAutoStartChanged)
+                            NavSection.Exclusions -> ExclusionsSection(
+                                strings = strings,
+                                browsersState = browsers,
+                                excluded = settings.excludedBrowserIds,
+                                onToggle = viewModel::onBrowserExclusionToggled,
+                                onRetry = viewModel::refreshBrowsers,
+                            )
                         }
-                    },
-                )
-                MainContent(
-                    lazyState = lazyState,
-                    strings = strings,
-                    settings = settings,
-                    onThemeSelected = viewModel::onThemeSelected,
-                    onLanguageSelected = viewModel::onLanguageSelected,
-                    onAutoStartChanged = viewModel::onAutoStartChanged,
-                    onExclusionToggled = viewModel::onBrowserExclusionToggled,
-                )
+                    }
+                }
             }
         }
     }
 }
+
+// region top bar + banner
 
 @Composable
 private fun TopAppBar(
@@ -133,11 +158,7 @@ private fun TopAppBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (appIconPainter != null) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(6.dp)),
-                ) {
+                Box(modifier = Modifier.size(24.dp)) {
                     Icon(
                         painter = appIconPainter,
                         contentDescription = strings.appName,
@@ -170,6 +191,76 @@ private fun TopAppBar(
         }
     }
 }
+
+@Composable
+private fun NotDefaultBanner(
+    strings: Strings,
+    canOpenSettings: Boolean,
+    onOpenSettings: () -> Unit,
+    onSelectDefaultSection: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .clickable(onClick = onSelectDefaultSection),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "!",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = strings.bannerNotDefaultTitle,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(
+                    text = strings.bannerNotDefaultBody,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
+                )
+            }
+            if (canOpenSettings) {
+                Spacer(Modifier.width(12.dp))
+                Button(
+                    onClick = onOpenSettings,
+                    shape = RoundedCornerShape(6.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) {
+                    Text(strings.bannerOpenSettings)
+                }
+            }
+        }
+    }
+}
+
+// endregion
+
+// region sidebar
 
 @Composable
 private fun Sidebar(
@@ -209,6 +300,9 @@ private fun Sidebar(
                 )
             }
 
+            NavItem(AppIcons.BrowserUpdated, strings.sectionDefaultBrowser,
+                active = activeSection == NavSection.DefaultBrowser,
+                onClick = { onSelect(NavSection.DefaultBrowser) })
             NavItem(AppIcons.Palette, strings.sectionAppearance,
                 active = activeSection == NavSection.Appearance,
                 onClick = { onSelect(NavSection.Appearance) })
@@ -218,7 +312,7 @@ private fun Sidebar(
             NavItem(AppIcons.SettingsSuggest, strings.sectionSystem,
                 active = activeSection == NavSection.System,
                 onClick = { onSelect(NavSection.System) })
-            NavItem(AppIcons.BrowserUpdated, strings.sectionBrowserExclusions,
+            NavItem(AppIcons.Settings, strings.sectionBrowserExclusions,
                 active = activeSection == NavSection.Exclusions,
                 onClick = { onSelect(NavSection.Exclusions) })
         }
@@ -270,78 +364,52 @@ private fun NavItem(
     }
 }
 
+// endregion
+
+// region section scaffolding
+
 @Composable
-private fun MainContent(
-    lazyState: LazyListState,
+private fun SectionPane(
     strings: Strings,
-    settings: AppSettings,
-    onThemeSelected: (AppTheme) -> Unit,
-    onLanguageSelected: (AppLanguage) -> Unit,
-    onAutoStartChanged: (Boolean) -> Unit,
-    onExclusionToggled: (BrowserId, Boolean) -> Unit,
+    title: String,
+    icon: ImageVector,
+    content: @Composable () -> Unit,
 ) {
-    LazyColumn(
-        state = lazyState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        item(key = NavSection.Appearance) {
-            CenteredItem {
-                AppearanceSection(strings, settings.theme, onThemeSelected)
-            }
-        }
-        item(key = NavSection.Language) {
-            CenteredItem {
-                LanguageSection(strings, settings.language, onLanguageSelected)
-            }
-        }
-        item(key = NavSection.System) {
-            CenteredItem {
-                SystemSection(strings, settings.autoStartEnabled, onAutoStartChanged)
-            }
-        }
-        item(key = NavSection.Exclusions) {
-            CenteredItem {
-                ExclusionsSection(strings, settings.excludedBrowserIds, onExclusionToggled)
-            }
-        }
-    }
-}
-
-// Mirrors the centering+max-width pattern that wraps the section list. Each
-// LazyColumn item gets it independently so animateScrollToItem aligns the
-// section's first element with the top of the visible content area.
-@Composable
-private fun CenteredItem(content: @Composable () -> Unit) {
-    Box(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = 720.dp)
-            .wrapContentWidth(Alignment.CenterHorizontally),
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
     ) {
-        content()
-    }
-}
-
-@Composable
-private fun SectionHeader(icon: ImageVector, title: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(bottom = 8.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 720.dp)
+                .wrapContentWidth(Alignment.CenterHorizontally),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                content()
+                // strings keeps the scope; explicit reference avoids unused warning when sections don't use it directly.
+                @Suppress("UNUSED_EXPRESSION") strings
+            }
+        }
     }
 }
 
@@ -365,14 +433,105 @@ private fun SectionCard(content: @Composable () -> Unit) {
     }
 }
 
+// endregion
+
+// region Default browser section
+
+@Composable
+private fun DefaultBrowserSection(
+    strings: Strings,
+    currentOs: HostOs,
+    isDefault: Boolean,
+    canOpenSettings: Boolean,
+    onOpenSettings: () -> Unit,
+) {
+    SectionPane(strings, strings.sectionDefaultBrowser, AppIcons.BrowserUpdated) {
+        SectionCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(isPositive = isDefault)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = if (isDefault) strings.defaultBrowserStatusYes else strings.defaultBrowserStatusNo,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+
+        SectionCard {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = strings.defaultBrowserInstructionsHeader,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                strings.defaultBrowserInstructions(currentOs).forEachIndexed { index, step ->
+                    Row(verticalAlignment = Alignment.Top) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                                    shape = RoundedCornerShape(6.dp),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = (index + 1).toString(),
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = step,
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                if (canOpenSettings) {
+                    Spacer(Modifier.height(4.dp))
+                    Button(
+                        onClick = onOpenSettings,
+                        shape = RoundedCornerShape(6.dp),
+                    ) {
+                        Text(strings.defaultBrowserOpenSystemSettings)
+                    }
+                }
+            }
+        }
+
+        Text(
+            text = strings.defaultBrowserPackagingNote,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun StatusDot(isPositive: Boolean) {
+    val color = if (isPositive) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .background(color = color, shape = RoundedCornerShape(50)),
+    )
+}
+
+// endregion
+
+// region Appearance / Language / System sections
+
 @Composable
 private fun AppearanceSection(
     strings: Strings,
     current: AppTheme,
     onSelected: (AppTheme) -> Unit,
 ) {
-    Column {
-        SectionHeader(AppIcons.Palette, strings.sectionAppearance)
+    SectionPane(strings, strings.sectionAppearance, AppIcons.Palette) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -401,8 +560,7 @@ private fun LanguageSection(
     current: AppLanguage,
     onSelected: (AppLanguage) -> Unit,
 ) {
-    Column {
-        SectionHeader(AppIcons.Translate, strings.sectionLanguage)
+    SectionPane(strings, strings.sectionLanguage, AppIcons.Translate) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -431,8 +589,7 @@ private fun SystemSection(
     autoStart: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
-    Column {
-        SectionHeader(AppIcons.SettingsSuggest, strings.sectionSystem)
+    SectionPane(strings, strings.sectionSystem, AppIcons.SettingsSuggest) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -468,49 +625,101 @@ private fun SystemSection(
     }
 }
 
+// endregion
+
+// region Exclusions section (real data)
+
 @Composable
 private fun ExclusionsSection(
     strings: Strings,
+    browsersState: BrowsersState,
     excluded: Set<BrowserId>,
+    onToggle: (BrowserId, Boolean) -> Unit,
+    onRetry: () -> Unit,
+) {
+    SectionPane(strings, strings.sectionBrowserExclusions, AppIcons.Settings) {
+        when (val s = browsersState) {
+            BrowsersState.Loading -> LoadingCard(strings)
+            is BrowsersState.Loaded -> if (s.browsers.isEmpty()) {
+                EmptyCard(strings)
+            } else {
+                BrowserList(
+                    browsers = s.browsers,
+                    excluded = excluded,
+                    strings = strings,
+                    onToggle = onToggle,
+                )
+            }
+            is BrowsersState.Error -> ErrorCard(strings, s.message, onRetry)
+        }
+    }
+}
+
+@Composable
+private fun LoadingCard(strings: Strings) {
+    SectionCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = strings.browsersLoading,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyCard(strings: Strings) {
+    SectionCard {
+        Text(
+            text = strings.browsersEmpty,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ErrorCard(strings: Strings, message: String, onRetry: () -> Unit) {
+    SectionCard {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = strings.browsersErrorPrefix + message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error,
+            )
+            OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(6.dp)) {
+                Text(strings.retry)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowserList(
+    browsers: List<Browser>,
+    excluded: Set<BrowserId>,
+    strings: Strings,
     onToggle: (BrowserId, Boolean) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val visible = remember(query) {
-        if (query.isBlank()) MockBrowsers
-        else MockBrowsers.filter { it.displayName.contains(query, ignoreCase = true) }
+    val visible = remember(query, browsers) {
+        if (query.isBlank()) browsers
+        else browsers.filter { it.displayName.contains(query, ignoreCase = true) }
     }
 
     Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = AppIcons.BrowserUpdated,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = strings.sectionBrowserExclusions,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = strings.addBrowser,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { /* TODO: open file picker — stage 2 */ },
-            )
-        }
-
         SearchField(query = query, onChange = { query = it }, placeholder = strings.searchBrowsers)
-        Spacer(Modifier.height(8.dp))
-
+        Spacer(Modifier.height(12.dp))
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -525,11 +734,12 @@ private fun ExclusionsSection(
                 ),
         ) {
             visible.forEachIndexed { index, browser ->
+                val id = BrowserId(browser.bundleId)
                 BrowserRow(
                     browser = browser,
-                    isExcluded = browser.id in excluded,
+                    isExcluded = id in excluded,
                     strings = strings,
-                    onToggle = { newValue -> onToggle(browser.id, newValue) },
+                    onToggle = { newValue -> onToggle(id, newValue) },
                 )
                 if (index != visible.lastIndex) {
                     Box(
@@ -541,21 +751,13 @@ private fun ExclusionsSection(
                     )
                 }
             }
-            if (visible.isEmpty()) {
-                Text(
-                    text = strings.emptyBrowsersMessage,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
         }
     }
 }
 
 @Composable
 private fun BrowserRow(
-    browser: MockBrowser,
+    browser: Browser,
     isExcluded: Boolean,
     strings: Strings,
     onToggle: (Boolean) -> Unit,
@@ -567,11 +769,11 @@ private fun BrowserRow(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BrowserIconBox(browser = browser)
+        BrowserIconBox(initial = browser.displayName.firstOrNull()?.uppercase() ?: "?")
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = browser.displayName,
+                text = browser.displayName + (browser.version?.let { " $it" } ?: ""),
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -582,27 +784,11 @@ private fun BrowserRow(
                     MaterialTheme.colorScheme.onSurface
                 },
             )
-            val secondary: String? = when {
-                isExcluded -> strings.excluded
-                browser.isSystemDefault -> strings.systemDefault
-                browser.secondaryLabel != null -> browser.secondaryLabel
-                else -> null
-            }
-            if (secondary != null) {
-                val secondaryColor = if (isExcluded) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.outline
-                }
-                Text(
-                    text = secondary.uppercase(),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    color = secondaryColor,
-                )
-            }
+            Text(
+                text = browser.bundleId,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.outline,
+            )
         }
         Text(
             text = if (isExcluded) strings.excluded else strings.included,
@@ -617,20 +803,20 @@ private fun BrowserRow(
 }
 
 @Composable
-private fun BrowserIconBox(browser: MockBrowser) {
+private fun BrowserIconBox(initial: String) {
     Box(
         modifier = Modifier
             .size(32.dp)
             .background(
-                color = browser.accentBackground,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(6.dp),
             ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = browser.initial,
+            text = initial,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = browser.accentForeground,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }
@@ -686,6 +872,10 @@ private fun SearchField(
     }
 }
 
+// endregion
+
+// region shared dropdown + tonal helpers
+
 @Composable
 private fun <T> EnumDropdown(
     value: T,
@@ -728,9 +918,6 @@ private fun <T> EnumDropdown(
     }
 }
 
-// surfaceContainer* roles aren't directly exposed on the M3 ColorScheme in
-// 1.10.x, so we fall back to the design-system values keyed by dark-mode
-// flag from LocalIsDarkMode.
 @Composable
 private fun surfaceContainerLow(): Color =
     if (LocalIsDarkMode.current) DarkSurfaceContainerLow else LightSurfaceContainerLow
@@ -738,3 +925,5 @@ private fun surfaceContainerLow(): Color =
 @Composable
 private fun surfaceContainerLowest(): Color =
     if (LocalIsDarkMode.current) DarkSurfaceContainerLowest else LightSurfaceContainerLowest
+
+// endregion
