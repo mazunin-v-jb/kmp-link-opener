@@ -1,6 +1,7 @@
 package dev.hackathon.linkopener.platform
 
 import dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager
+import dev.hackathon.linkopener.platform.macos.MacOsBrowserDiscovery
 
 object PlatformFactory {
 
@@ -11,6 +12,13 @@ object PlatformFactory {
         HostOs.Windows,
         HostOs.Linux,
         HostOs.Other -> NoOpAutoStartManager()
+    }
+
+    fun createBrowserDiscovery(): BrowserDiscovery = when (currentOs) {
+        HostOs.MacOs -> MacOsBrowserDiscovery()
+        HostOs.Windows,
+        HostOs.Linux,
+        HostOs.Other -> EmptyBrowserDiscovery(System.getProperty("os.name").orEmpty())
     }
 
     private fun detectHostOs(): HostOs {
