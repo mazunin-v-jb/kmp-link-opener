@@ -1,6 +1,5 @@
 package dev.hackathon.linkopener.ui.settings
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -140,24 +139,30 @@ fun SettingsScreen(
                         .weight(1f)
                         .fillMaxHeight(),
                 ) {
-                    Crossfade(targetState = activeSection) { section ->
-                        when (section) {
-                            NavSection.DefaultBrowser -> DefaultBrowserSection(
-                                currentOs = currentOs,
-                                isDefault = isDefault,
-                                canOpenSettings = viewModel.canOpenSystemSettings,
-                                onOpenSettings = viewModel::openSystemSettings,
-                            )
-                            NavSection.Appearance -> AppearanceSection(settings.theme, viewModel::onThemeSelected)
-                            NavSection.Language -> LanguageSection(settings.language, viewModel::onLanguageSelected)
-                            NavSection.System -> SystemSection(settings.autoStartEnabled, viewModel::onAutoStartChanged)
-                            NavSection.Exclusions -> ExclusionsSection(
-                                browsersState = browsers,
-                                excluded = settings.excludedBrowserIds,
-                                onToggle = viewModel::onBrowserExclusionToggled,
-                                onRetry = viewModel::refreshBrowsers,
-                            )
-                        }
+                    // Plain `when` instead of Crossfade — Crossfade caches the
+                    // content lambda per targetState, so when only the locale
+                    // changed (activeSection unchanged) the lambda wasn't
+                    // re-invoked and the visible section kept its old strings
+                    // until the user navigated. With direct rendering each
+                    // SettingsScreen recomposition (including the one
+                    // triggered by settings.language flow) re-runs the active
+                    // branch and stringResource() picks up the new locale.
+                    when (activeSection) {
+                        NavSection.DefaultBrowser -> DefaultBrowserSection(
+                            currentOs = currentOs,
+                            isDefault = isDefault,
+                            canOpenSettings = viewModel.canOpenSystemSettings,
+                            onOpenSettings = viewModel::openSystemSettings,
+                        )
+                        NavSection.Appearance -> AppearanceSection(settings.theme, viewModel::onThemeSelected)
+                        NavSection.Language -> LanguageSection(settings.language, viewModel::onLanguageSelected)
+                        NavSection.System -> SystemSection(settings.autoStartEnabled, viewModel::onAutoStartChanged)
+                        NavSection.Exclusions -> ExclusionsSection(
+                            browsersState = browsers,
+                            excluded = settings.excludedBrowserIds,
+                            onToggle = viewModel::onBrowserExclusionToggled,
+                            onRetry = viewModel::refreshBrowsers,
+                        )
                     }
                 }
             }
