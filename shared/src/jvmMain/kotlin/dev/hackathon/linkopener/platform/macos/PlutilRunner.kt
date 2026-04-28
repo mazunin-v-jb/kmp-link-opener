@@ -3,11 +3,11 @@ package dev.hackathon.linkopener.platform.macos
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
-class PlutilRunner(
+open class PlutilRunner(
     private val executable: String = "/usr/bin/plutil",
     private val timeoutSeconds: Long = 5,
 ) {
-    fun toJson(plistPath: Path): String? {
+    open fun toJson(plistPath: Path): String? {
         val process = try {
             ProcessBuilder(executable, "-convert", "json", "-o", "-", plistPath.toString())
                 .redirectErrorStream(false)

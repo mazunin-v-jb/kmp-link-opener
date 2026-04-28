@@ -23,8 +23,11 @@ object PlatformFactory {
 
     fun createUrlReceiver(): UrlReceiver = JvmUrlReceiver()
 
-    private fun detectHostOs(): HostOs {
-        val name = System.getProperty("os.name")?.lowercase().orEmpty()
+    private fun detectHostOs(): HostOs =
+        detectHostOs(System.getProperty("os.name").orEmpty())
+
+    internal fun detectHostOs(osName: String): HostOs {
+        val name = osName.lowercase()
         return when {
             "mac" in name || "darwin" in name -> HostOs.MacOs
             "win" in name -> HostOs.Windows

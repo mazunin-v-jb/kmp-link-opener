@@ -5,9 +5,9 @@ import java.nio.file.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
 
-class AppBundleScanner {
+open class AppBundleScanner {
 
-    fun findAppBundles(root: Path, maxDepth: Int = 2): List<Path> {
+    open fun findAppBundles(root: Path, maxDepth: Int = 2): List<Path> {
         if (!root.isDirectory()) return emptyList()
         val results = mutableListOf<Path>()
         scan(root, depth = 0, maxDepth = maxDepth, results = results)

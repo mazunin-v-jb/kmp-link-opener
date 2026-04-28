@@ -5,6 +5,7 @@ compose-multiplatform = "1.10.3"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.10.0"
 multiplatformSettings = "1.3.0"
+kover = "0.9.1"
 
 [libraries]
 
@@ -25,3 +26,4 @@ kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref 
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

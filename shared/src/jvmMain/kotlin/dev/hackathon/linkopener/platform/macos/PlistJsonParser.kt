@@ -10,11 +10,11 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Path
 import kotlin.io.path.nameWithoutExtension
 
-class PlistJsonParser(
+open class PlistJsonParser(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
 
-    fun parseBrowser(jsonText: String, applicationPath: Path): Browser? {
+    open fun parseBrowser(jsonText: String, applicationPath: Path): Browser? {
         val root = runCatching { json.parseToJsonElement(jsonText).jsonObject }.getOrNull()
             ?: return null
 
