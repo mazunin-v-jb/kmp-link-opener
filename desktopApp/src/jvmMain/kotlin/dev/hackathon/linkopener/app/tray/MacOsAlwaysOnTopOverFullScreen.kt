@@ -43,8 +43,13 @@ import java.awt.Window
  */
 object MacOsAlwaysOnTopOverFullScreen {
 
-    // NSWindow level constants (NSWindow.h)
-    private const val NS_STATUS_WINDOW_LEVEL = 25L
+    // NSWindow level constants (NSWindow.h). NSStatusWindowLevel (25) sits
+    // above the menu bar but is still below a fullscreen app's overlay on
+    // modern macOS. NSScreenSaverWindowLevel (1000) is the nuclear option —
+    // above everything except actual screen savers — and is what apps that
+    // need to float above fullscreen content (Bumpr-style switchers, hotkey
+    // overlays, etc.) typically use.
+    private const val NS_SCREEN_SAVER_WINDOW_LEVEL = 1000L
     // NSWindowCollectionBehavior bit flags (NSWindow.h)
     private const val CAN_JOIN_ALL_SPACES = 1L          // 1 << 0
     private const val FULL_SCREEN_AUXILIARY = 1L shl 8  // 256
@@ -83,14 +88,14 @@ object MacOsAlwaysOnTopOverFullScreen {
         try {
             val setLevelSel = lib.sel_registerName("setLevel:")
             val setBehaviorSel = lib.sel_registerName("setCollectionBehavior:")
-            lib.objc_msgSend(nsWindowPtr, setLevelSel, NativeLong(NS_STATUS_WINDOW_LEVEL))
+            lib.objc_msgSend(nsWindowPtr, setLevelSel, NativeLong(NS_SCREEN_SAVER_WINDOW_LEVEL))
             lib.objc_msgSend(
                 nsWindowPtr,
                 setBehaviorSel,
                 NativeLong(CAN_JOIN_ALL_SPACES or FULL_SCREEN_AUXILIARY),
             )
             println(
-                "$TAG applied — level=$NS_STATUS_WINDOW_LEVEL, " +
+                "$TAG applied — level=$NS_SCREEN_SAVER_WINDOW_LEVEL, " +
                     "behavior=${CAN_JOIN_ALL_SPACES or FULL_SCREEN_AUXILIARY}, " +
                     "ptr=0x${java.lang.Long.toHexString(Pointer.nativeValue(nsWindowPtr))}",
             )
