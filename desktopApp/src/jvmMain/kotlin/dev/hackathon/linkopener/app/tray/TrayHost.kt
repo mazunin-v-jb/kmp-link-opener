@@ -20,6 +20,7 @@ fun ApplicationScope.TrayHost(
     onExit: () -> Unit,
 ) {
     val appInfo = remember(container) { container.getAppInfoUseCase() }
+    val settingsViewModel = remember(container) { container.newSettingsViewModel() }
     var settingsOpen by remember { mutableStateOf(false) }
 
     Tray(
@@ -38,7 +39,7 @@ fun ApplicationScope.TrayHost(
             state = rememberWindowState(width = 720.dp, height = 480.dp),
         ) {
             MaterialTheme {
-                SettingsScreen()
+                SettingsScreen(viewModel = settingsViewModel)
             }
         }
     }
