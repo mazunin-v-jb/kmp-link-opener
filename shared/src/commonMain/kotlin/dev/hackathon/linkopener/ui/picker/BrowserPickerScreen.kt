@@ -49,16 +49,21 @@ import org.jetbrains.compose.resources.stringResource
 
 private const val DEFAULT_VISIBLE_COUNT = 3
 
+// "Show all" pulls the popup three more rows down so the user sees twice
+// the original count without scrolling, with the rest reachable via scroll.
+private const val EXPANDED_VISIBLE_COUNT = DEFAULT_VISIBLE_COUNT * 2
+
 // Each BrowserRow is icon-bound (32dp icon + 10dp top + 10dp bottom padding = 52dp),
-// so we can cap the expanded scroll viewport at 3 * 52dp without measuring.
+// so we can cap the expanded scroll viewport without measuring.
 private val ROW_HEIGHT = 52.dp
-private val EXPANDED_SCROLL_MAX_HEIGHT = ROW_HEIGHT * DEFAULT_VISIBLE_COUNT
+private val EXPANDED_SCROLL_MAX_HEIGHT = ROW_HEIGHT * EXPANDED_VISIBLE_COUNT
 
 @Composable
 fun BrowserPickerScreen(
     url: String,
     browsers: List<Browser>,
     onPick: (Browser) -> Unit,
+    onExpand: () -> Unit = {},
     headerWrapper: @Composable (content: @Composable () -> Unit) -> Unit = { it() },
 ) {
     var expanded by remember(browsers) { mutableStateOf(false) }
@@ -93,7 +98,10 @@ fun BrowserPickerScreen(
                 if (browsers.size > DEFAULT_VISIBLE_COUNT) {
                     ShowAllButton(
                         label = "${stringResource(Res.string.picker_show_all)} (${browsers.size})",
-                        onClick = { expanded = true },
+                        onClick = {
+                            expanded = true
+                            onExpand()
+                        },
                     )
                 }
             }

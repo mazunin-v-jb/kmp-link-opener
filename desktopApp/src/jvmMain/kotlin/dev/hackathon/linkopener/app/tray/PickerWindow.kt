@@ -10,6 +10,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
@@ -31,8 +32,8 @@ fun ApplicationScope.PickerWindow(
 ) {
     val windowState = rememberWindowState(
         position = currentCursorWindowPosition(),
-        width = 320.dp,
-        height = 320.dp,
+        width = PICKER_WIDTH,
+        height = PICKER_HEIGHT_COLLAPSED,
     )
     Window(
         onCloseRequest = onDismiss,
@@ -72,6 +73,12 @@ fun ApplicationScope.PickerWindow(
             url = url,
             browsers = browsers,
             onPick = onPick,
+            // "Show all" grows the popup downward so the previously hidden
+            // browsers fit alongside the original three, with the whole list
+            // scrollable inside.
+            onExpand = {
+                windowState.size = DpSize(PICKER_WIDTH, PICKER_HEIGHT_EXPANDED)
+            },
             // Header doubles as a drag handle so users can reposition the
             // popup without a title bar (we run undecorated). WindowDraggableArea
             // is a WindowScope extension, so resolution depends on this lambda
@@ -80,6 +87,12 @@ fun ApplicationScope.PickerWindow(
         )
     }
 }
+
+// Collapsed fits 3 rows + "Show all" + the URL header. Expanded adds three
+// more rows of viewport — see EXPANDED_VISIBLE_COUNT in BrowserPickerScreen.
+private val PICKER_WIDTH = 320.dp
+private val PICKER_HEIGHT_COLLAPSED = 320.dp
+private val PICKER_HEIGHT_EXPANDED = 480.dp
 
 private fun currentCursorWindowPosition(): WindowPosition {
     val location = MouseInfo.getPointerInfo()?.location ?: return WindowPosition.PlatformDefault
