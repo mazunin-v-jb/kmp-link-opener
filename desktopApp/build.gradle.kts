@@ -37,17 +37,25 @@ val composePackageVersion = "1.0.0"
 val signingIdentity: String? = findProperty("macos.signing.identity") as String?
 val notarizationProfile: String? = findProperty("macos.notarization.profile") as String?
 
+// Required by MacOsAlwaysOnTopOverFullScreen — reflects into the AWT peer
+// chain to grab the underlying NSWindow pointer. We need both --add-exports
+// (so the unnamed module can SEE sun.awt / sun.lwawt classes at all) and
+// --add-opens (so we can setAccessible on the private CFRetainedResource.ptr
+// field). Harmless warnings on non-mac OSes — the sun.lwawt.macosx package
+// just doesn't exist there.
+val nativeAccessJvmArgs = listOf(
+    "--add-exports", "java.desktop/sun.awt=ALL-UNNAMED",
+    "--add-exports", "java.desktop/sun.lwawt=ALL-UNNAMED",
+    "--add-exports", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+    "--add-opens", "java.desktop/sun.awt=ALL-UNNAMED",
+    "--add-opens", "java.desktop/sun.lwawt=ALL-UNNAMED",
+    "--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+)
+
 compose.desktop {
     application {
         mainClass = "dev.hackathon.linkopener.app.MainKt"
-        // Required by MacOsAlwaysOnTopOverFullScreen — reflects into the AWT
-        // peer chain to grab the underlying NSWindow pointer. Harmless
-        // warnings on non-mac OSes (sun.lwawt.macosx package missing).
-        jvmArgs += listOf(
-            "--add-opens", "java.desktop/sun.awt=ALL-UNNAMED",
-            "--add-opens", "java.desktop/sun.lwawt=ALL-UNNAMED",
-            "--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
-        )
+        jvmArgs += nativeAccessJvmArgs
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = composePackageName
@@ -107,6 +115,14 @@ compose.desktop {
             }
         }
     }
+}
+
+// Belt-and-suspenders: ensure the same args reach the gradle :desktopApp:run
+// JavaExec task whether or not the compose plugin propagates application.jvmArgs
+// to it. IDEA's Compose run config builds on top of this task, so this is what
+// makes the in-IDE debug run honour the args.
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs(nativeAccessJvmArgs)
 }
 
 if (notarizationProfile != null) {
