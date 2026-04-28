@@ -111,7 +111,7 @@ val EnglishStrings: Strings = Strings(
     defaultBrowserStatusNo = "Link Opener is not the default browser.",
     defaultBrowserInstructionsHeader = "How to make Link Opener your default",
     defaultBrowserInstructionsMacOs = listOf(
-        "Click the button below to open System Settings → General.",
+        "Click the button below to open System Settings → Desktop & Dock.",
         "Scroll to the “Default web browser” dropdown.",
         "Pick Link Opener from the list.",
     ),
@@ -170,7 +170,7 @@ val RussianStrings: Strings = Strings(
     defaultBrowserStatusNo = "Link Opener не является браузером по умолчанию.",
     defaultBrowserInstructionsHeader = "Как сделать Link Opener браузером по умолчанию",
     defaultBrowserInstructionsMacOs = listOf(
-        "Нажмите кнопку ниже — откроется «Системные настройки» → «Основные».",
+        "Нажмите кнопку ниже — откроется «Системные настройки» → «Рабочий стол и Dock».",
         "Найдите выпадающий список «Веб-браузер по умолчанию».",
         "Выберите Link Opener из списка.",
     ),
