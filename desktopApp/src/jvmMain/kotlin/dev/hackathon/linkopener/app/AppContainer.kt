@@ -89,6 +89,12 @@ class AppContainer {
     )
 
     init {
+        // Apply the loaded language's locale to the JVM immediately, before
+        // Compose ever composes anything. Otherwise the first composition
+        // would use the system locale even if the user previously saved a
+        // different choice.
+        applyJvmLocale(settingsRepository.settings.value.language)
+
         // Warm-up discovery on startup so the picker shows instantly when the
         // first URL arrives instead of paying the 1-3s plutil latency. The
         // result is cached inside BrowserRepositoryImpl, so subsequent
@@ -127,7 +133,27 @@ class AppContainer {
         openDefaultBrowserSettings = openDefaultBrowserSettingsUseCase,
         getCanOpenSystemSettings = getCanOpenSystemSettingsUseCase,
         scope = coroutineScope,
+        applyLocale = ::applyJvmLocale,
     )
+
+    // Translates user-selected AppLanguage into the JVM Locale.getDefault()
+    // override that Compose Resources reads through. Falls back to "en" for
+    // the System mode when the host locale isn't one of our supported
+    // languages.
+    private fun applyJvmLocale(language: dev.hackathon.linkopener.core.model.AppLanguage) {
+        val tag = when (language) {
+            dev.hackathon.linkopener.core.model.AppLanguage.En -> "en"
+            dev.hackathon.linkopener.core.model.AppLanguage.Ru -> "ru"
+            dev.hackathon.linkopener.core.model.AppLanguage.System -> {
+                val systemTag = java.util.Locale.getDefault().language
+                if (systemTag == "ru") "ru" else "en"
+            }
+        }
+        val target = java.util.Locale.forLanguageTag(tag)
+        if (java.util.Locale.getDefault() != target) {
+            java.util.Locale.setDefault(target)
+        }
+    }
 
     private companion object {
         // Set `-Dlinkopener.debug=true` (e.g. via JVM args in IDE run config or

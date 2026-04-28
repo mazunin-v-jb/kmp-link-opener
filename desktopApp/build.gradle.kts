@@ -17,6 +17,7 @@ kotlin {
             implementation(project(":shared"))
             implementation(compose.desktop.currentOs)
             implementation(libs.compose.material3)
+            implementation(libs.compose.resources)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatformSettings)

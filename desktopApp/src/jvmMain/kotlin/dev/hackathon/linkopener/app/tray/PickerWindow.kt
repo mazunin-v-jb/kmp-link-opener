@@ -17,7 +17,6 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.ui.picker.BrowserPickerScreen
-import dev.hackathon.linkopener.ui.strings.Strings
 import java.awt.MouseInfo
 import kotlinx.coroutines.flow.drop
 
@@ -26,7 +25,6 @@ import kotlinx.coroutines.flow.drop
 fun ApplicationScope.PickerWindow(
     url: String,
     browsers: List<Browser>,
-    strings: Strings,
     onPick: (Browser) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -72,7 +70,6 @@ fun ApplicationScope.PickerWindow(
         BrowserPickerScreen(
             url = url,
             browsers = browsers,
-            strings = strings,
             onPick = onPick,
         )
     }
