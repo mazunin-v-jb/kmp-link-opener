@@ -4,13 +4,20 @@ import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
+import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
+import dev.hackathon.linkopener.domain.usecase.IsDefaultBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
@@ -19,9 +26,26 @@ class SettingsViewModel(
     private val updateLanguage: UpdateLanguageUseCase,
     private val setAutoStart: SetAutoStartUseCase,
     private val setBrowserExcluded: SetBrowserExcludedUseCase,
+    private val discoverBrowsers: DiscoverBrowsersUseCase,
+    private val isDefaultBrowserUseCase: IsDefaultBrowserUseCase,
+    private val openDefaultBrowserSettings: OpenDefaultBrowserSettingsUseCase,
+    getCanOpenSystemSettings: GetCanOpenSystemSettingsUseCase,
     private val scope: CoroutineScope,
 ) {
     val settings: StateFlow<AppSettings> = getSettings()
+
+    val canOpenSystemSettings: Boolean = getCanOpenSystemSettings()
+
+    private val _browsers = MutableStateFlow<BrowsersState>(BrowsersState.Loading)
+    val browsers: StateFlow<BrowsersState> = _browsers.asStateFlow()
+
+    private val _isDefaultBrowser = MutableStateFlow(false)
+    val isDefaultBrowser: StateFlow<Boolean> = _isDefaultBrowser.asStateFlow()
+
+    init {
+        refreshBrowsers()
+        recheckDefaultBrowser()
+    }
 
     fun onThemeSelected(theme: AppTheme) {
         scope.launch { updateTheme(theme) }
@@ -37,5 +61,30 @@ class SettingsViewModel(
 
     fun onBrowserExclusionToggled(id: BrowserId, excluded: Boolean) {
         scope.launch { setBrowserExcluded(id, excluded) }
+    }
+
+    fun refreshBrowsers() {
+        scope.launch {
+            _browsers.value = BrowsersState.Loading
+            try {
+                _browsers.value = BrowsersState.Loaded(discoverBrowsers())
+            } catch (t: CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                _browsers.value = BrowsersState.Error(t.message ?: "Browser discovery failed")
+            }
+        }
+    }
+
+    fun recheckDefaultBrowser() {
+        scope.launch {
+            _isDefaultBrowser.value = runCatching { isDefaultBrowserUseCase() }.getOrDefault(false)
+        }
+    }
+
+    fun openSystemSettings() {
+        scope.launch {
+            openDefaultBrowserSettings()
+        }
     }
 }

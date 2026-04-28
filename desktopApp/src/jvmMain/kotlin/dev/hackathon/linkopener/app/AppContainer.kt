@@ -9,13 +9,18 @@ import dev.hackathon.linkopener.domain.repository.BrowserRepository
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetAppInfoUseCase
+import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
+import dev.hackathon.linkopener.domain.usecase.IsDefaultBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.AutoStartManager
 import dev.hackathon.linkopener.platform.BrowserDiscovery
+import dev.hackathon.linkopener.platform.DefaultBrowserService
+import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.platform.PlatformFactory
 import dev.hackathon.linkopener.platform.UrlReceiver
 import dev.hackathon.linkopener.ui.settings.SettingsViewModel
@@ -30,17 +35,17 @@ class AppContainer {
 
     val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    val currentOs: HostOs = PlatformFactory.currentOs
+
     private val json: Json = Json { ignoreUnknownKeys = true }
 
-    // Uses java.util.prefs under the hood on JVM via multiplatform-settings-no-arg.
-    // Preferences land in the user root node — namespacing by app keys
-    // (settings.theme, settings.language, ...) keeps them from colliding with
-    // anything else the JVM might write into prefs.
     private val settingsStore: Settings = Settings()
 
     private val autoStartManager: AutoStartManager = PlatformFactory.createAutoStartManager()
     private val browserDiscovery: BrowserDiscovery = PlatformFactory.createBrowserDiscovery()
     val urlReceiver: UrlReceiver = PlatformFactory.createUrlReceiver()
+    private val defaultBrowserService: DefaultBrowserService =
+        PlatformFactory.createDefaultBrowserService()
 
     private val appInfoRepository: AppInfoRepository = AppInfoRepositoryImpl()
     private val browserRepository: BrowserRepository = BrowserRepositoryImpl(browserDiscovery)
@@ -57,6 +62,7 @@ class AppContainer {
     val setAutoStartUseCase: SetAutoStartUseCase = SetAutoStartUseCase(settingsRepository)
     val setBrowserExcludedUseCase: SetBrowserExcludedUseCase =
         SetBrowserExcludedUseCase(settingsRepository)
+
     // Must match nativeDistributions.macOS.bundleID in desktopApp/build.gradle.kts.
     // Used to exclude ourselves from the discovered-browsers list — otherwise
     // picking "Link Opener" as the handler would loop URLs back into our own
@@ -65,6 +71,12 @@ class AppContainer {
 
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
         DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
+    val isDefaultBrowserUseCase: IsDefaultBrowserUseCase =
+        IsDefaultBrowserUseCase(defaultBrowserService)
+    val openDefaultBrowserSettingsUseCase: OpenDefaultBrowserSettingsUseCase =
+        OpenDefaultBrowserSettingsUseCase(defaultBrowserService)
+    val getCanOpenSystemSettingsUseCase: GetCanOpenSystemSettingsUseCase =
+        GetCanOpenSystemSettingsUseCase(defaultBrowserService)
 
     init {
         coroutineScope.launch {
@@ -92,6 +104,10 @@ class AppContainer {
         updateLanguage = updateLanguageUseCase,
         setAutoStart = setAutoStartUseCase,
         setBrowserExcluded = setBrowserExcludedUseCase,
+        discoverBrowsers = discoverBrowsersUseCase,
+        isDefaultBrowserUseCase = isDefaultBrowserUseCase,
+        openDefaultBrowserSettings = openDefaultBrowserSettingsUseCase,
+        getCanOpenSystemSettings = getCanOpenSystemSettingsUseCase,
         scope = coroutineScope,
     )
 }

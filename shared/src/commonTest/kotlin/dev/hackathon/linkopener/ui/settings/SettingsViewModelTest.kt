@@ -3,15 +3,24 @@ package dev.hackathon.linkopener.ui.settings
 import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
+import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.domain.repository.BrowserRepository
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
+import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
+import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
+import dev.hackathon.linkopener.domain.usecase.IsDefaultBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
+import dev.hackathon.linkopener.platform.DefaultBrowserService
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -23,7 +32,7 @@ class SettingsViewModelTest {
     @Test
     fun forwardsSettingsFromUseCase() = runTest {
         val repo = FakeSettingsRepository()
-        val vm = newViewModel(repo, this)
+        val vm = newViewModel(repo = repo, scope = this)
 
         repo.emit(AppSettings(theme = AppTheme.Dark))
 
@@ -33,7 +42,7 @@ class SettingsViewModelTest {
     @Test
     fun onThemeSelectedDelegatesToRepository() = runTest {
         val repo = FakeSettingsRepository()
-        val vm = newViewModel(repo, this)
+        val vm = newViewModel(repo = repo, scope = this)
 
         vm.onThemeSelected(AppTheme.Light)
         testScheduler.advanceUntilIdle()
@@ -44,7 +53,7 @@ class SettingsViewModelTest {
     @Test
     fun onLanguageSelectedDelegatesToRepository() = runTest {
         val repo = FakeSettingsRepository()
-        val vm = newViewModel(repo, this)
+        val vm = newViewModel(repo = repo, scope = this)
 
         vm.onLanguageSelected(AppLanguage.En)
         testScheduler.advanceUntilIdle()
@@ -55,7 +64,7 @@ class SettingsViewModelTest {
     @Test
     fun onAutoStartChangedDelegatesToRepository() = runTest {
         val repo = FakeSettingsRepository()
-        val vm = newViewModel(repo, this)
+        val vm = newViewModel(repo = repo, scope = this)
 
         vm.onAutoStartChanged(true)
         testScheduler.advanceUntilIdle()
@@ -63,12 +72,98 @@ class SettingsViewModelTest {
         assertEquals(true, repo.lastAutoStart)
     }
 
-    private fun newViewModel(repo: SettingsRepository, scope: TestScope) = SettingsViewModel(
+    @Test
+    fun browsersStateMovesFromLoadingToLoaded() = runTest {
+        val repo = FakeSettingsRepository()
+        val browsers = listOf(
+            Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", "17.4"),
+        )
+        val vm = newViewModel(
+            repo = repo,
+            browsers = browsers,
+            scope = this,
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        val state = vm.browsers.value
+        assertIs<BrowsersState.Loaded>(state)
+        assertEquals(browsers, state.browsers)
+    }
+
+    @Test
+    fun browsersStateGoesToErrorOnDiscoveryFailure() = runTest {
+        val repo = FakeSettingsRepository()
+        val vm = newViewModel(
+            repo = repo,
+            browserRepository = ThrowingBrowserRepository("boom"),
+            scope = this,
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        val state = vm.browsers.value
+        assertIs<BrowsersState.Error>(state)
+        assertEquals("boom", state.message)
+    }
+
+    @Test
+    fun isDefaultBrowserReflectsServiceAnswer() = runTest {
+        val service = FakeDefaultBrowserService(isDefault = true)
+        val vm = newViewModel(
+            repo = FakeSettingsRepository(),
+            defaultBrowserService = service,
+            scope = this,
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(true, vm.isDefaultBrowser.value)
+    }
+
+    @Test
+    fun openSystemSettingsDelegatesToService() = runTest {
+        val service = FakeDefaultBrowserService()
+        val vm = newViewModel(
+            repo = FakeSettingsRepository(),
+            defaultBrowserService = service,
+            scope = this,
+        )
+
+        vm.openSystemSettings()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, service.openCount)
+    }
+
+    @Test
+    fun canOpenSystemSettingsForwardsServiceFlag() = runTest {
+        val service = FakeDefaultBrowserService(canOpen = false)
+        val vm = newViewModel(
+            repo = FakeSettingsRepository(),
+            defaultBrowserService = service,
+            scope = this,
+        )
+
+        assertTrue(!vm.canOpenSystemSettings)
+    }
+
+    private fun newViewModel(
+        repo: SettingsRepository,
+        scope: TestScope,
+        browsers: List<Browser> = emptyList(),
+        browserRepository: BrowserRepository = StaticBrowserRepository(browsers),
+        defaultBrowserService: DefaultBrowserService = FakeDefaultBrowserService(),
+    ): SettingsViewModel = SettingsViewModel(
         getSettings = GetSettingsFlowUseCase(repo),
         updateTheme = UpdateThemeUseCase(repo),
         updateLanguage = UpdateLanguageUseCase(repo),
         setAutoStart = SetAutoStartUseCase(repo),
         setBrowserExcluded = SetBrowserExcludedUseCase(repo),
+        discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
+        isDefaultBrowserUseCase = IsDefaultBrowserUseCase(defaultBrowserService),
+        openDefaultBrowserSettings = OpenDefaultBrowserSettingsUseCase(defaultBrowserService),
+        getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(defaultBrowserService),
         scope = scope,
     )
 
@@ -106,6 +201,27 @@ class SettingsViewModelTest {
                     else it.excludedBrowserIds - id,
                 )
             }
+        }
+    }
+
+    private class StaticBrowserRepository(private val browsers: List<Browser>) : BrowserRepository {
+        override suspend fun getInstalledBrowsers(): List<Browser> = browsers
+    }
+
+    private class ThrowingBrowserRepository(private val message: String) : BrowserRepository {
+        override suspend fun getInstalledBrowsers(): List<Browser> = error(message)
+    }
+
+    private class FakeDefaultBrowserService(
+        private val isDefault: Boolean = false,
+        private val canOpen: Boolean = true,
+    ) : DefaultBrowserService {
+        var openCount: Int = 0
+        override val canOpenSystemSettings: Boolean = canOpen
+        override suspend fun isDefaultBrowser(): Boolean = isDefault
+        override suspend fun openSystemSettings(): Boolean {
+            openCount += 1
+            return true
         }
     }
 }

@@ -1,7 +1,10 @@
 package dev.hackathon.linkopener.platform
 
+import dev.hackathon.linkopener.platform.linux.LinuxDefaultBrowserService
 import dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserDiscovery
+import dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService
+import dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService
 
 object PlatformFactory {
 
@@ -23,6 +26,13 @@ object PlatformFactory {
 
     fun createUrlReceiver(): UrlReceiver = JvmUrlReceiver()
 
+    fun createDefaultBrowserService(): DefaultBrowserService = when (currentOs) {
+        HostOs.MacOs -> MacOsDefaultBrowserService()
+        HostOs.Windows -> WindowsDefaultBrowserService()
+        HostOs.Linux,
+        HostOs.Other -> LinuxDefaultBrowserService()
+    }
+
     private fun detectHostOs(): HostOs =
         detectHostOs(System.getProperty("os.name").orEmpty())
 
@@ -36,5 +46,3 @@ object PlatformFactory {
         }
     }
 }
-
-enum class HostOs { MacOs, Windows, Linux, Other }
