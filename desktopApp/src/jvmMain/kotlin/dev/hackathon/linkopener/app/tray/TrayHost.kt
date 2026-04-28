@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,9 +39,12 @@ fun ApplicationScope.TrayHost(
 
     // Compose Resources resolves the active locale from
     // androidx.compose.ui.text.intl.Locale.current → java.util.Locale.getDefault()
-    // on JVM. To make user-selected language take effect we override the JVM
-    // default and re-key the subtree so the new locale is read on next pass.
-    // Side effect is JVM-wide (DateFormat / NumberFormat etc.) — acceptable for
+    // on JVM. We override the JVM default whenever the user's selected
+    // language changes — but synchronously during the composition body
+    // (rather than via DisposableEffect+key) so the change propagates on
+    // the SAME recomposition pass. With key() the entire subtree was being
+    // disposed and recreated, which closed any open Window children. Side
+    // effect is JVM-wide (DateFormat / NumberFormat etc.) — acceptable for
     // this app since we don't display dates / formatted numbers.
     val systemTag = remember { Locale.getDefault().language }
     val resolvedLocaleTag = remember(settings.language, systemTag) {
@@ -52,21 +54,28 @@ fun ApplicationScope.TrayHost(
             AppLanguage.System -> if (systemTag == "ru") "ru" else "en"
         }
     }
-    DisposableEffect(resolvedLocaleTag) {
-        val previous = Locale.getDefault()
-        Locale.setDefault(Locale.forLanguageTag(resolvedLocaleTag))
-        onDispose { Locale.setDefault(previous) }
+    val targetLocale = remember(resolvedLocaleTag) { Locale.forLanguageTag(resolvedLocaleTag) }
+    if (Locale.getDefault() != targetLocale) {
+        // Idempotent set — Compose may re-run this body multiple times per
+        // recomposition cycle and the equality guard avoids redundant calls.
+        Locale.setDefault(targetLocale)
+    }
+    val originalLocale = remember { Locale.getDefault() }
+    DisposableEffect(Unit) {
+        onDispose {
+            // Restore on full TrayHost teardown so we don't leak the override
+            // into the JVM after shutdown.
+            Locale.setDefault(originalLocale)
+        }
     }
 
-    key(resolvedLocaleTag) {
-        TrayHostBody(
-            container = container,
-            settings = settings,
-            settingsViewModel = settingsViewModel,
-            appVersion = appInfo.version,
-            onExit = onExit,
-        )
-    }
+    TrayHostBody(
+        container = container,
+        settings = settings,
+        settingsViewModel = settingsViewModel,
+        appVersion = appInfo.version,
+        onExit = onExit,
+    )
 }
 
 @Composable
