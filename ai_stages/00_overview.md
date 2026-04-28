@@ -32,10 +32,10 @@
 
 ## Версии (используем те, что в `gradle/libs.versions.toml`)
 
-- Kotlin **2.3.20**
-- Compose Multiplatform **1.10.3**
+- Kotlin **2.3.21**
+- Compose Multiplatform **1.11.0-beta03**
 - kotlinx-coroutines **1.10.2**
-- kotlinx-serialization **1.10.0**
+- kotlinx-serialization **1.11.0**
 - multiplatform-settings **1.3.0**
 - Material 3 (через Compose MP `material3`) — добавляется на стадии 1
 

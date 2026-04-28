@@ -22,7 +22,7 @@
 
 ## Архитектура локали
 
-**Проблема:** в Compose Multiplatform 1.10.3 `LocalComposeEnvironment` — `internal`, пользовательский CompositionLocal на локаль не пробросить. `stringResource()` внутри читает `androidx.compose.ui.text.intl.Locale.current` который на JVM мапится на `java.util.Locale.getDefault()`.
+**Проблема:** в Compose Multiplatform 1.11.0-beta03 `LocalComposeEnvironment` — `internal`, пользовательский CompositionLocal на локаль не пробросить. `stringResource()` внутри читает `androidx.compose.ui.text.intl.Locale.current` который на JVM мапится на `java.util.Locale.getDefault()`.
 
 **Решение:** перед композицией с пользовательской локалью делаем `java.util.Locale.setDefault(...)` через `DisposableEffect(resolvedLocale)`, и оборачиваем контент в `key(resolvedLocale)` чтобы при смене локали сабтри пересоздалась.
 

@@ -110,9 +110,9 @@ No DI framework — `AppContainer` wires the graph by hand. Platform-specific be
 
 ## Dependencies
 
-Versions are managed in `gradle/libs.versions.toml`. Compose Multiplatform components are pulled via the Compose plugin's `compose.runtime` / `compose.foundation` / `compose.components.resources` accessors at version `1.10.3`. Material 3 is now declared as a direct dependency from the version catalog (see "Polish: material3" below) instead of the plugin shorthand to silence the deprecation warning.
+Versions are managed in `gradle/libs.versions.toml`. Compose Multiplatform components are pulled via the Compose plugin's `compose.runtime` / `compose.foundation` / `compose.components.resources` accessors at version `1.11.0-beta03`. Material 3 is now declared as a direct dependency from the version catalog (see "Polish: material3" below) instead of the plugin shorthand to silence the deprecation warning.
 
-Other notable deps: `kotlinx-coroutines` (with `kotlinx-coroutines-swing` for the JVM EDT dispatcher), `kotlinx-serialization-json` (used by `SettingsRepositoryImpl` and the macOS plist parsers), `multiplatform-settings-no-arg` (for persistence), Kover `0.9.1` (for coverage on `:shared`).
+Other notable deps: `kotlinx-coroutines` (with `kotlinx-coroutines-swing` for the JVM EDT dispatcher), `kotlinx-serialization-json` (used by `SettingsRepositoryImpl` and the macOS plist parsers), `multiplatform-settings-no-arg` (for persistence), Kover `0.9.8` (for coverage on `:shared`).
 
 ## Native distributables (macOS specifics)
 

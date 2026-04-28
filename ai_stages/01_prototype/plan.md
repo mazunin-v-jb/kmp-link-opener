@@ -28,6 +28,8 @@
 2. **`gradle/libs.versions.toml`** — добавить:
    - `compose-material3` (`org.jetbrains.compose.material3:material3`, version ref `compose-multiplatform`)
    - алиас `compose-desktop` (плагин уже есть как `compose-multiplatform`, но для модуля app нужен сам плагин — переиспользуем существующий).
+
+   > **Не актуально на текущей стадии (2026-04-28).** `compose-material3` теперь объявлен с собственным `version.ref = "compose-material3"` (отдельная переменная в `[versions]`), а не шарит ref с `compose-multiplatform`. Причина — линейки релизов разъехались: Compose MP идёт на `1.11.0-beta03`, тогда как actively maintained material3 живёт в `1.11.0-alpha07`. Алиас `compose-desktop` так и не понадобился — плагин `compose-multiplatform` применяется и в `:desktopApp` напрямую.
 3. **`shared/build.gradle.kts`** — добавить material3 в `commonMain` зависимости. Maven-publish конфигурация остаётся (это всё ещё библиотека).
 4. **`desktopApp/build.gradle.kts`** — новый файл:
    - плагины: `kotlin.multiplatform`, `compose.multiplatform`, `compose.compiler`
