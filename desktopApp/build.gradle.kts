@@ -16,7 +16,7 @@ kotlin {
         jvmMain.dependencies {
             implementation(project(":shared"))
             implementation(compose.desktop.currentOs)
-            implementation(compose.material3)
+            implementation(libs.compose.material3)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatformSettings)

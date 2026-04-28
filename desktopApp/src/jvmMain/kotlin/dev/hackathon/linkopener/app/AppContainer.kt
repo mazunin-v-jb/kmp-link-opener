@@ -89,21 +89,29 @@ class AppContainer {
     )
 
     init {
+        // Warm-up discovery on startup so the picker shows instantly when the
+        // first URL arrives instead of paying the 1-3s plutil latency. The
+        // result is cached inside BrowserRepositoryImpl, so subsequent
+        // discoverBrowsersUseCase() calls hit memory.
         coroutineScope.launch {
             try {
                 val browsers = discoverBrowsersUseCase()
-                println("Discovered ${browsers.size} browser(s):")
-                browsers.forEach { browser ->
-                    val version = browser.version ?: "(no version)"
-                    println(
-                        "  - ${browser.displayName} $version " +
-                            "(${browser.bundleId}) at ${browser.applicationPath}",
-                    )
+                if (DEBUG_LOGGING) {
+                    println("Discovered ${browsers.size} browser(s):")
+                    browsers.forEach { browser ->
+                        val version = browser.version ?: "(no version)"
+                        println(
+                            "  - ${browser.displayName} $version " +
+                                "(${browser.bundleId}) at ${browser.applicationPath}",
+                        )
+                    }
                 }
             } catch (t: CancellationException) {
                 throw t
             } catch (t: Throwable) {
-                println("[ERROR] Browser discovery failed: ${t.message}")
+                // Errors always surface — they indicate a real problem we want
+                // to see in Console.app even outside debug mode.
+                System.err.println("[ERROR] Browser discovery failed: ${t.message}")
             }
         }
     }
@@ -120,4 +128,11 @@ class AppContainer {
         getCanOpenSystemSettings = getCanOpenSystemSettingsUseCase,
         scope = coroutineScope,
     )
+
+    private companion object {
+        // Set `-Dlinkopener.debug=true` (e.g. via JVM args in IDE run config or
+        // VM options when launching the .app from Terminal) to get the discovery
+        // dump and any other diagnostic prints in stdout.
+        val DEBUG_LOGGING: Boolean = System.getProperty("linkopener.debug") == "true"
+    }
 }
