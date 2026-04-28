@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings shell -->
+    <string name="settings_title">Настройки</string>
+    <string name="section_default_browser">Браузер по умолчанию</string>
+    <string name="section_appearance">Оформление</string>
+    <string name="section_language">Язык</string>
+    <string name="section_system">Система</string>
+    <string name="section_browser_exclusions">Исключения браузеров</string>
+
+    <!-- Appearance -->
+    <string name="theme_mode">Режим темы</string>
+    <string name="theme_system">Системная</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Тёмная</string>
+
+    <!-- Language -->
+    <string name="app_language">Язык приложения</string>
+    <string name="language_system">Системный</string>
+
+    <!-- System -->
+    <string name="start_at_login">Запускать при входе</string>
+    <string name="start_at_login_description">Автоматически запускать Link Opener при старте компьютера, чтобы он всегда был готов в трее.</string>
+
+    <!-- Browser exclusions list -->
+    <string name="add_browser">+ Добавить браузер…</string>
+    <string name="search_browsers">Поиск браузеров…</string>
+    <string name="included">Включён</string>
+    <string name="excluded">Исключён</string>
+    <string name="system_default">По умолчанию в системе</string>
+    <string name="empty_browsers_message">Установленные браузеры пока не найдены.</string>
+
+    <!-- Tray + window -->
+    <string name="help">Помощь</string>
+    <string name="close">Закрыть</string>
+    <string name="configure">Настроить</string>
+    <string name="tray_menu_settings">Настройки</string>
+    <string name="tray_menu_quit">Выход</string>
+    <string name="tray_menu_test_picker">Тест picker\'а (dev)</string>
+    <string name="tray_window_settings_suffix">" — Настройки"</string>
+
+    <!-- Default-browser banner + section -->
+    <string name="banner_not_default_title">Link Opener не выбран браузером по умолчанию</string>
+    <string name="banner_not_default_body">Назначьте Link Opener браузером по умолчанию, чтобы перехватывать ссылки из любых приложений.</string>
+    <string name="banner_open_settings">Открыть настройки</string>
+    <string name="default_browser_status_yes">Link Opener сейчас выбран браузером по умолчанию.</string>
+    <string name="default_browser_status_no">Link Opener не является браузером по умолчанию.</string>
+    <string name="default_browser_instructions_header">Как сделать Link Opener браузером по умолчанию</string>
+    <string name="default_browser_open_system_settings">Открыть системные настройки</string>
+    <string name="default_browser_packaging_note">Пока Link Opener не упакован в установщик, ОС не будет показывать его в списке кандидатов. Подготовьте шаги сейчас, а завершите после ближайшего релиза с пакетом.</string>
+    <string name="default_browser_unsupported_os">Эта операционная система пока не поддерживается.</string>
+
+    <string-array name="default_browser_instructions_macos">
+        <item>Нажмите кнопку ниже — откроется «Системные настройки» → «Рабочий стол и Dock».</item>
+        <item>Найдите выпадающий список «Веб-браузер по умолчанию».</item>
+        <item>Выберите Link Opener из списка.</item>
+    </string-array>
+    <string-array name="default_browser_instructions_windows">
+        <item>Нажмите кнопку ниже — откроется Параметры → Приложения → Приложения по умолчанию.</item>
+        <item>Найдите категорию «Веб-браузер».</item>
+        <item>Кликните по текущему браузеру и выберите Link Opener.</item>
+    </string-array>
+    <string-array name="default_browser_instructions_linux">
+        <item>Откройте терминал.</item>
+        <item>Выполните: xdg-settings set default-web-browser link-opener.desktop</item>
+        <item>Либо воспользуйтесь менеджером приложений по умолчанию вашего DE (например, GNOME Control Center → «Приложения по умолчанию»).</item>
+    </string-array>
+
+    <!-- Browser list states -->
+    <string name="browsers_loading">Сканирую установленные браузеры…</string>
+    <string name="browsers_empty">Браузеры в системе не найдены.</string>
+    <string name="browsers_error_prefix">"Ошибка обнаружения браузеров: "</string>
+    <string name="retry">Повторить</string>
+
+    <!-- Picker popup -->
+    <string name="picker_header_open">Открыть в:</string>
+    <string name="picker_show_all">Показать все</string>
+    <string name="picker_empty">Браузеры недоступны</string>
+    <string name="picker_empty_hint">Откройте настройки, чтобы убрать исключения или установить браузер.</string>
+</resources>

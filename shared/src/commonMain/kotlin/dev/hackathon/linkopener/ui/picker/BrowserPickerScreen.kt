@@ -29,12 +29,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.hackathon.linkopener.core.model.Browser
-import dev.hackathon.linkopener.ui.strings.Strings
 import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLow
 import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLow
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LocalIsDarkMode
+import kmp_link_opener.shared.generated.resources.Res
+import kmp_link_opener.shared.generated.resources.picker_empty
+import kmp_link_opener.shared.generated.resources.picker_empty_hint
+import kmp_link_opener.shared.generated.resources.picker_header_open
+import kmp_link_opener.shared.generated.resources.picker_show_all
+import org.jetbrains.compose.resources.stringResource
 
 private const val DEFAULT_VISIBLE_COUNT = 3
 
@@ -42,7 +47,6 @@ private const val DEFAULT_VISIBLE_COUNT = 3
 fun BrowserPickerScreen(
     url: String,
     browsers: List<Browser>,
-    strings: Strings,
     onPick: (Browser) -> Unit,
 ) {
     var expanded by remember(browsers) { mutableStateOf(false) }
@@ -61,17 +65,17 @@ fun BrowserPickerScreen(
         ),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Header(strings = strings, url = url)
+            Header(url = url)
 
             if (browsers.isEmpty()) {
-                EmptyState(strings)
+                EmptyState()
             } else {
                 visible.forEach { browser ->
                     BrowserRow(browser = browser, onClick = { onPick(browser) })
                 }
                 if (!expanded && browsers.size > DEFAULT_VISIBLE_COUNT) {
                     ShowAllButton(
-                        label = "${strings.pickerShowAll} (${browsers.size})",
+                        label = "${stringResource(Res.string.picker_show_all)} (${browsers.size})",
                         onClick = { expanded = true },
                     )
                 }
@@ -81,14 +85,14 @@ fun BrowserPickerScreen(
 }
 
 @Composable
-private fun Header(strings: Strings, url: String) {
+private fun Header(url: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
-            text = strings.pickerHeaderOpen,
+            text = stringResource(Res.string.picker_header_open),
             style = MaterialTheme.typography.labelMedium.copy(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
@@ -192,7 +196,7 @@ private fun ShowAllButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EmptyState(strings: Strings) {
+private fun EmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -201,12 +205,12 @@ private fun EmptyState(strings: Strings) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = strings.pickerEmpty,
+            text = stringResource(Res.string.picker_empty),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = strings.pickerEmptyHint,
+            text = stringResource(Res.string.picker_empty_hint),
             style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

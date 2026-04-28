@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand -->
+    <string name="app_name">Link Opener</string>
+    <string name="version_prefix">v</string>
+
+    <!-- Settings shell -->
+    <string name="settings_title">Settings</string>
+    <string name="section_default_browser">Default browser</string>
+    <string name="section_appearance">Appearance</string>
+    <string name="section_language">Language</string>
+    <string name="section_system">System</string>
+    <string name="section_browser_exclusions">Browser exclusions</string>
+
+    <!-- Appearance -->
+    <string name="theme_mode">Theme Mode</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <!-- Language -->
+    <string name="app_language">App Language</string>
+    <string name="language_system">System</string>
+    <!-- Language names always stay in their native form regardless of UI locale.
+         Default + values-ru both read these from the default file. -->
+    <string name="language_english_native">English</string>
+    <string name="language_russian_native">Русский</string>
+
+    <!-- System -->
+    <string name="start_at_login">Start at login</string>
+    <string name="start_at_login_description">Automatically launch Link Opener when you start your computer to keep it ready in the system tray.</string>
+
+    <!-- Browser exclusions list -->
+    <string name="add_browser">+ Add browser…</string>
+    <string name="search_browsers">Search browsers…</string>
+    <string name="included">Included</string>
+    <string name="excluded">Excluded</string>
+    <string name="system_default">System Default</string>
+    <string name="empty_browsers_message">No installed browsers detected yet.</string>
+
+    <!-- Tray + window -->
+    <string name="help">Help</string>
+    <string name="close">Close</string>
+    <string name="configure">Configure</string>
+    <string name="tray_menu_settings">Settings</string>
+    <string name="tray_menu_quit">Quit</string>
+    <string name="tray_menu_test_picker">Test picker (dev)</string>
+    <string name="tray_window_settings_suffix">" — Settings"</string>
+
+    <!-- Default-browser banner + section -->
+    <string name="banner_not_default_title">Link Opener isn\'t your default browser</string>
+    <string name="banner_not_default_body">Set Link Opener as the default to intercept links opened from any app.</string>
+    <string name="banner_open_settings">Open settings</string>
+    <string name="default_browser_status_yes">Link Opener is currently the default browser.</string>
+    <string name="default_browser_status_no">Link Opener is not the default browser.</string>
+    <string name="default_browser_instructions_header">How to make Link Opener your default</string>
+    <string name="default_browser_open_system_settings">Open System Settings</string>
+    <string name="default_browser_packaging_note">Until Link Opener is installed via a packaged build, the OS will not list it as a browser candidate. You can prepare the steps now and finish them after the next packaging release.</string>
+    <string name="default_browser_unsupported_os">This operating system isn\'t supported yet.</string>
+
+    <string-array name="default_browser_instructions_macos">
+        <item>Click the button below to open System Settings → Desktop &amp; Dock.</item>
+        <item>Scroll to the "Default web browser" dropdown.</item>
+        <item>Pick Link Opener from the list.</item>
+    </string-array>
+    <string-array name="default_browser_instructions_windows">
+        <item>Click the button below to open Settings → Apps → Default apps.</item>
+        <item>Find "Web browser" in the list of categories.</item>
+        <item>Click the current default and select Link Opener.</item>
+    </string-array>
+    <string-array name="default_browser_instructions_linux">
+        <item>Open a terminal.</item>
+        <item>Run: xdg-settings set default-web-browser link-opener.desktop</item>
+        <item>Or use your distribution\'s default-applications manager (e.g., GNOME Control Center → Default Applications).</item>
+    </string-array>
+
+    <!-- Browser list states -->
+    <string name="browsers_loading">Scanning installed browsers…</string>
+    <string name="browsers_empty">No browsers detected on this system.</string>
+    <string name="browsers_error_prefix">"Browser discovery failed: "</string>
+    <string name="retry">Retry</string>
+
+    <!-- Picker popup -->
+    <string name="picker_header_open">Open in:</string>
+    <string name="picker_show_all">Show all</string>
+    <string name="picker_empty">No browsers available</string>
+    <string name="picker_empty_hint">Open Settings to manage exclusions or install a browser.</string>
+</resources>

@@ -8,6 +8,12 @@ plugins {
     alias(libs.plugins.kover)
 }
 
+// Make the generated `Res` class public so the desktopApp module can reach
+// `Res.string.*` / `Res.array.*` accessors.
+compose.resources {
+    publicResClass = true
+}
+
 kotlin {
     jvm {
         compilerOptions { jvmTarget = JvmTarget.JVM_17 }

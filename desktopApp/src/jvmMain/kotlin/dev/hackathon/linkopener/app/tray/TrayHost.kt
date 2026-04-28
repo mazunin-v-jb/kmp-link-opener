@@ -1,8 +1,10 @@
 package dev.hackathon.linkopener.app.tray
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -13,12 +15,19 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
+import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
-import dev.hackathon.linkopener.ui.strings.resolveStrings
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
 import java.awt.MouseInfo
 import java.util.Locale
+import kmp_link_opener.shared.generated.resources.Res
+import kmp_link_opener.shared.generated.resources.app_name
+import kmp_link_opener.shared.generated.resources.tray_menu_quit
+import kmp_link_opener.shared.generated.resources.tray_menu_settings
+import kmp_link_opener.shared.generated.resources.tray_menu_test_picker
+import kmp_link_opener.shared.generated.resources.tray_window_settings_suffix
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ApplicationScope.TrayHost(
@@ -29,12 +38,45 @@ fun ApplicationScope.TrayHost(
     val settingsViewModel = remember(container) { container.newSettingsViewModel() }
     val settings by settingsViewModel.settings.collectAsState()
 
-    val systemLanguageTag = remember { Locale.getDefault().language }
-
-    val strings = remember(settings.language, systemLanguageTag) {
-        resolveStrings(settings.language, systemLanguageTag)
+    // Compose Resources resolves the active locale from
+    // androidx.compose.ui.text.intl.Locale.current → java.util.Locale.getDefault()
+    // on JVM. To make user-selected language take effect we override the JVM
+    // default and re-key the subtree so the new locale is read on next pass.
+    // Side effect is JVM-wide (DateFormat / NumberFormat etc.) — acceptable for
+    // this app since we don't display dates / formatted numbers.
+    val systemTag = remember { Locale.getDefault().language }
+    val resolvedLocaleTag = remember(settings.language, systemTag) {
+        when (settings.language) {
+            AppLanguage.En -> "en"
+            AppLanguage.Ru -> "ru"
+            AppLanguage.System -> if (systemTag == "ru") "ru" else "en"
+        }
+    }
+    DisposableEffect(resolvedLocaleTag) {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag(resolvedLocaleTag))
+        onDispose { Locale.setDefault(previous) }
     }
 
+    key(resolvedLocaleTag) {
+        TrayHostBody(
+            container = container,
+            settings = settings,
+            settingsViewModel = settingsViewModel,
+            appVersion = appInfo.version,
+            onExit = onExit,
+        )
+    }
+}
+
+@Composable
+private fun ApplicationScope.TrayHostBody(
+    container: AppContainer,
+    settings: dev.hackathon.linkopener.core.model.AppSettings,
+    settingsViewModel: dev.hackathon.linkopener.ui.settings.SettingsViewModel,
+    appVersion: String,
+    onExit: () -> Unit,
+) {
     val trayIconPainter = remember { loadTrayIconPainter() }
     val appIconPainter = remember { loadAppIconPainter() }
 
@@ -42,19 +84,24 @@ fun ApplicationScope.TrayHost(
 
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
+    val appName = stringResource(Res.string.app_name)
+
     Tray(
         icon = trayIconPainter,
-        tooltip = strings.appName,
+        tooltip = appName,
         menu = {
-            Item(strings.trayMenuSettings, onClick = { settingsAnchor = currentCursorPosition() })
+            Item(
+                stringResource(Res.string.tray_menu_settings),
+                onClick = { settingsAnchor = currentCursorPosition() },
+            )
             // TODO: remove the dev-only "Test picker" entry before public
             //  release. It's here so the picker can be exercised without
             //  packaging + installing the app as the OS default browser.
             Item(
-                strings.trayMenuTestPicker,
+                stringResource(Res.string.tray_menu_test_picker),
                 onClick = { container.pickerCoordinator.handleIncomingUrl("https://example.com/?utm=picker-test") },
             )
-            Item(strings.trayMenuQuit, onClick = onExit)
+            Item(stringResource(Res.string.tray_menu_quit), onClick = onExit)
         },
     )
 
@@ -64,7 +111,6 @@ fun ApplicationScope.TrayHost(
             PickerWindow(
                 url = currentPickerState.url,
                 browsers = currentPickerState.browsers,
-                strings = strings,
                 onPick = container.pickerCoordinator::pickBrowser,
                 onDismiss = container.pickerCoordinator::dismiss,
             )
@@ -80,7 +126,7 @@ fun ApplicationScope.TrayHost(
         )
         Window(
             onCloseRequest = { settingsAnchor = null },
-            title = strings.appName + strings.trayWindowSettingsSuffix,
+            title = appName + stringResource(Res.string.tray_window_settings_suffix),
             state = windowState,
             icon = appIconPainter,
             alwaysOnTop = true,
@@ -88,8 +134,7 @@ fun ApplicationScope.TrayHost(
             LinkOpenerTheme(theme = settings.theme) {
                 SettingsScreen(
                     viewModel = settingsViewModel,
-                    strings = strings,
-                    appVersion = appInfo.version,
+                    appVersion = appVersion,
                     currentOs = container.currentOs,
                     appIconPainter = appIconPainter,
                     onCloseRequest = { settingsAnchor = null },

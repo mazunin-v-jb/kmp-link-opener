@@ -52,25 +52,57 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.hackathon.linkopener.core.model.AppLanguage
-import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.icons.AppIcons
-import dev.hackathon.linkopener.ui.strings.Strings
+import dev.hackathon.linkopener.ui.strings.defaultBrowserInstructions
+import dev.hackathon.linkopener.ui.strings.languageLabel
+import dev.hackathon.linkopener.ui.strings.themeLabel
 import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLow
 import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLow
 import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LocalIsDarkMode
+import kmp_link_opener.shared.generated.resources.Res
+import kmp_link_opener.shared.generated.resources.add_browser
+import kmp_link_opener.shared.generated.resources.app_language
+import kmp_link_opener.shared.generated.resources.app_name
+import kmp_link_opener.shared.generated.resources.banner_not_default_body
+import kmp_link_opener.shared.generated.resources.banner_not_default_title
+import kmp_link_opener.shared.generated.resources.banner_open_settings
+import kmp_link_opener.shared.generated.resources.browsers_empty
+import kmp_link_opener.shared.generated.resources.browsers_error_prefix
+import kmp_link_opener.shared.generated.resources.browsers_loading
+import kmp_link_opener.shared.generated.resources.close as closeStr
+import kmp_link_opener.shared.generated.resources.default_browser_instructions_header
+import kmp_link_opener.shared.generated.resources.default_browser_open_system_settings
+import kmp_link_opener.shared.generated.resources.default_browser_packaging_note
+import kmp_link_opener.shared.generated.resources.default_browser_status_no
+import kmp_link_opener.shared.generated.resources.default_browser_status_yes
+import kmp_link_opener.shared.generated.resources.excluded as excludedStr
+import kmp_link_opener.shared.generated.resources.help as helpStr
+import kmp_link_opener.shared.generated.resources.included as includedStr
+import kmp_link_opener.shared.generated.resources.retry as retryStr
+import kmp_link_opener.shared.generated.resources.search_browsers
+import kmp_link_opener.shared.generated.resources.section_appearance
+import kmp_link_opener.shared.generated.resources.section_browser_exclusions
+import kmp_link_opener.shared.generated.resources.section_default_browser
+import kmp_link_opener.shared.generated.resources.section_language
+import kmp_link_opener.shared.generated.resources.section_system
+import kmp_link_opener.shared.generated.resources.settings_title
+import kmp_link_opener.shared.generated.resources.start_at_login
+import kmp_link_opener.shared.generated.resources.start_at_login_description
+import kmp_link_opener.shared.generated.resources.theme_mode
+import kmp_link_opener.shared.generated.resources.version_prefix
+import org.jetbrains.compose.resources.stringResource
 
 private enum class NavSection { DefaultBrowser, Appearance, Language, System, Exclusions }
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    strings: Strings,
     appVersion: String,
     currentOs: HostOs,
     appIconPainter: Painter? = null,
@@ -87,13 +119,11 @@ fun SettingsScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                strings = strings,
                 appIconPainter = appIconPainter,
                 onCloseRequest = onCloseRequest,
             )
             if (!isDefault) {
                 NotDefaultBanner(
-                    strings = strings,
                     canOpenSettings = viewModel.canOpenSystemSettings,
                     onOpenSettings = viewModel::openSystemSettings,
                     onSelectDefaultSection = { activeSection = NavSection.DefaultBrowser },
@@ -101,7 +131,6 @@ fun SettingsScreen(
             }
             Row(modifier = Modifier.fillMaxSize()) {
                 Sidebar(
-                    strings = strings,
                     appVersion = appVersion,
                     activeSection = activeSection,
                     onSelect = { activeSection = it },
@@ -114,17 +143,15 @@ fun SettingsScreen(
                     Crossfade(targetState = activeSection) { section ->
                         when (section) {
                             NavSection.DefaultBrowser -> DefaultBrowserSection(
-                                strings = strings,
                                 currentOs = currentOs,
                                 isDefault = isDefault,
                                 canOpenSettings = viewModel.canOpenSystemSettings,
                                 onOpenSettings = viewModel::openSystemSettings,
                             )
-                            NavSection.Appearance -> AppearanceSection(strings, settings.theme, viewModel::onThemeSelected)
-                            NavSection.Language -> LanguageSection(strings, settings.language, viewModel::onLanguageSelected)
-                            NavSection.System -> SystemSection(strings, settings.autoStartEnabled, viewModel::onAutoStartChanged)
+                            NavSection.Appearance -> AppearanceSection(settings.theme, viewModel::onThemeSelected)
+                            NavSection.Language -> LanguageSection(settings.language, viewModel::onLanguageSelected)
+                            NavSection.System -> SystemSection(settings.autoStartEnabled, viewModel::onAutoStartChanged)
                             NavSection.Exclusions -> ExclusionsSection(
-                                strings = strings,
                                 browsersState = browsers,
                                 excluded = settings.excludedBrowserIds,
                                 onToggle = viewModel::onBrowserExclusionToggled,
@@ -142,10 +169,10 @@ fun SettingsScreen(
 
 @Composable
 private fun TopAppBar(
-    strings: Strings,
     appIconPainter: Painter?,
     onCloseRequest: () -> Unit,
 ) {
+    val appName = stringResource(Res.string.app_name)
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = surfaceContainerLow(),
@@ -161,7 +188,7 @@ private fun TopAppBar(
                 Box(modifier = Modifier.size(24.dp)) {
                     Icon(
                         painter = appIconPainter,
-                        contentDescription = strings.appName,
+                        contentDescription = appName,
                         tint = Color.Unspecified,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -169,7 +196,7 @@ private fun TopAppBar(
                 Spacer(Modifier.width(12.dp))
             }
             Text(
-                text = strings.appName,
+                text = appName,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -177,14 +204,14 @@ private fun TopAppBar(
             IconButton(onClick = { /* TODO: help action */ }) {
                 Icon(
                     imageVector = AppIcons.Help,
-                    contentDescription = strings.help,
+                    contentDescription = stringResource(Res.string.helpStr),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onCloseRequest) {
                 Icon(
                     imageVector = AppIcons.Close,
-                    contentDescription = strings.close,
+                    contentDescription = stringResource(Res.string.closeStr),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -194,7 +221,6 @@ private fun TopAppBar(
 
 @Composable
 private fun NotDefaultBanner(
-    strings: Strings,
     canOpenSettings: Boolean,
     onOpenSettings: () -> Unit,
     onSelectDefaultSection: () -> Unit,
@@ -228,7 +254,7 @@ private fun NotDefaultBanner(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = strings.bannerNotDefaultTitle,
+                    text = stringResource(Res.string.banner_not_default_title),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -236,7 +262,7 @@ private fun NotDefaultBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )
                 Text(
-                    text = strings.bannerNotDefaultBody,
+                    text = stringResource(Res.string.banner_not_default_body),
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
                 )
@@ -251,7 +277,7 @@ private fun NotDefaultBanner(
                         contentColor = MaterialTheme.colorScheme.onError,
                     ),
                 ) {
-                    Text(strings.bannerOpenSettings)
+                    Text(stringResource(Res.string.banner_open_settings))
                 }
             }
         }
@@ -264,7 +290,6 @@ private fun NotDefaultBanner(
 
 @Composable
 private fun Sidebar(
-    strings: Strings,
     appVersion: String,
     activeSection: NavSection,
     onSelect: (NavSection) -> Unit,
@@ -286,7 +311,7 @@ private fun Sidebar(
                     .padding(bottom = 24.dp),
             ) {
                 Text(
-                    text = strings.settingsTitle,
+                    text = stringResource(Res.string.settings_title),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
@@ -294,25 +319,25 @@ private fun Sidebar(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = strings.versionPrefix + appVersion,
+                    text = stringResource(Res.string.version_prefix) + appVersion,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            NavItem(AppIcons.BrowserUpdated, strings.sectionDefaultBrowser,
+            NavItem(AppIcons.BrowserUpdated, stringResource(Res.string.section_default_browser),
                 active = activeSection == NavSection.DefaultBrowser,
                 onClick = { onSelect(NavSection.DefaultBrowser) })
-            NavItem(AppIcons.Palette, strings.sectionAppearance,
+            NavItem(AppIcons.Palette, stringResource(Res.string.section_appearance),
                 active = activeSection == NavSection.Appearance,
                 onClick = { onSelect(NavSection.Appearance) })
-            NavItem(AppIcons.Translate, strings.sectionLanguage,
+            NavItem(AppIcons.Translate, stringResource(Res.string.section_language),
                 active = activeSection == NavSection.Language,
                 onClick = { onSelect(NavSection.Language) })
-            NavItem(AppIcons.SettingsSuggest, strings.sectionSystem,
+            NavItem(AppIcons.SettingsSuggest, stringResource(Res.string.section_system),
                 active = activeSection == NavSection.System,
                 onClick = { onSelect(NavSection.System) })
-            NavItem(AppIcons.Settings, strings.sectionBrowserExclusions,
+            NavItem(AppIcons.Settings, stringResource(Res.string.section_browser_exclusions),
                 active = activeSection == NavSection.Exclusions,
                 onClick = { onSelect(NavSection.Exclusions) })
         }
@@ -370,7 +395,6 @@ private fun NavItem(
 
 @Composable
 private fun SectionPane(
-    strings: Strings,
     title: String,
     icon: ImageVector,
     content: @Composable () -> Unit,
@@ -406,8 +430,6 @@ private fun SectionPane(
                     )
                 }
                 content()
-                // strings keeps the scope; explicit reference avoids unused warning when sections don't use it directly.
-                @Suppress("UNUSED_EXPRESSION") strings
             }
         }
     }
@@ -439,19 +461,22 @@ private fun SectionCard(content: @Composable () -> Unit) {
 
 @Composable
 private fun DefaultBrowserSection(
-    strings: Strings,
     currentOs: HostOs,
     isDefault: Boolean,
     canOpenSettings: Boolean,
     onOpenSettings: () -> Unit,
 ) {
-    SectionPane(strings, strings.sectionDefaultBrowser, AppIcons.BrowserUpdated) {
+    SectionPane(stringResource(Res.string.section_default_browser), AppIcons.BrowserUpdated) {
         SectionCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusDot(isPositive = isDefault)
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = if (isDefault) strings.defaultBrowserStatusYes else strings.defaultBrowserStatusNo,
+                    text = if (isDefault) {
+                        stringResource(Res.string.default_browser_status_yes)
+                    } else {
+                        stringResource(Res.string.default_browser_status_no)
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -461,11 +486,11 @@ private fun DefaultBrowserSection(
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = strings.defaultBrowserInstructionsHeader,
+                    text = stringResource(Res.string.default_browser_instructions_header),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                strings.defaultBrowserInstructions(currentOs).forEachIndexed { index, step ->
+                defaultBrowserInstructions(currentOs).forEachIndexed { index, step ->
                     Row(verticalAlignment = Alignment.Top) {
                         Box(
                             modifier = Modifier
@@ -497,14 +522,14 @@ private fun DefaultBrowserSection(
                         onClick = onOpenSettings,
                         shape = RoundedCornerShape(6.dp),
                     ) {
-                        Text(strings.defaultBrowserOpenSystemSettings)
+                        Text(stringResource(Res.string.default_browser_open_system_settings))
                     }
                 }
             }
         }
 
         Text(
-            text = strings.defaultBrowserPackagingNote,
+            text = stringResource(Res.string.default_browser_packaging_note),
             style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -527,11 +552,10 @@ private fun StatusDot(isPositive: Boolean) {
 
 @Composable
 private fun AppearanceSection(
-    strings: Strings,
     current: AppTheme,
     onSelected: (AppTheme) -> Unit,
 ) {
-    SectionPane(strings, strings.sectionAppearance, AppIcons.Palette) {
+    SectionPane(stringResource(Res.string.section_appearance), AppIcons.Palette) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -539,14 +563,14 @@ private fun AppearanceSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = strings.themeMode,
+                    text = stringResource(Res.string.theme_mode),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 EnumDropdown(
                     value = current,
                     options = AppTheme.entries,
-                    optionLabel = strings::label,
+                    optionLabel = { themeLabel(it) },
                     onSelected = onSelected,
                 )
             }
@@ -556,11 +580,10 @@ private fun AppearanceSection(
 
 @Composable
 private fun LanguageSection(
-    strings: Strings,
     current: AppLanguage,
     onSelected: (AppLanguage) -> Unit,
 ) {
-    SectionPane(strings, strings.sectionLanguage, AppIcons.Translate) {
+    SectionPane(stringResource(Res.string.section_language), AppIcons.Translate) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -568,14 +591,14 @@ private fun LanguageSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = strings.appLanguage,
+                    text = stringResource(Res.string.app_language),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 EnumDropdown(
                     value = current,
                     options = AppLanguage.entries,
-                    optionLabel = strings::label,
+                    optionLabel = { languageLabel(it) },
                     onSelected = onSelected,
                 )
             }
@@ -585,11 +608,10 @@ private fun LanguageSection(
 
 @Composable
 private fun SystemSection(
-    strings: Strings,
     autoStart: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
-    SectionPane(strings, strings.sectionSystem, AppIcons.SettingsSuggest) {
+    SectionPane(stringResource(Res.string.section_system), AppIcons.SettingsSuggest) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -598,13 +620,13 @@ private fun SystemSection(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = strings.startAtLogin,
+                        text = stringResource(Res.string.start_at_login),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = strings.startAtLoginDescription,
+                        text = stringResource(Res.string.start_at_login_description),
                         style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -631,32 +653,30 @@ private fun SystemSection(
 
 @Composable
 private fun ExclusionsSection(
-    strings: Strings,
     browsersState: BrowsersState,
     excluded: Set<BrowserId>,
     onToggle: (BrowserId, Boolean) -> Unit,
     onRetry: () -> Unit,
 ) {
-    SectionPane(strings, strings.sectionBrowserExclusions, AppIcons.Settings) {
+    SectionPane(stringResource(Res.string.section_browser_exclusions), AppIcons.Settings) {
         when (val s = browsersState) {
-            BrowsersState.Loading -> LoadingCard(strings)
+            BrowsersState.Loading -> LoadingCard()
             is BrowsersState.Loaded -> if (s.browsers.isEmpty()) {
-                EmptyCard(strings)
+                EmptyCard()
             } else {
                 BrowserList(
                     browsers = s.browsers,
                     excluded = excluded,
-                    strings = strings,
                     onToggle = onToggle,
                 )
             }
-            is BrowsersState.Error -> ErrorCard(strings, s.message, onRetry)
+            is BrowsersState.Error -> ErrorCard(s.message, onRetry)
         }
     }
 }
 
 @Composable
-private fun LoadingCard(strings: Strings) {
+private fun LoadingCard() {
     SectionCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -669,7 +689,7 @@ private fun LoadingCard(strings: Strings) {
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                text = strings.browsersLoading,
+                text = stringResource(Res.string.browsers_loading),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -678,10 +698,10 @@ private fun LoadingCard(strings: Strings) {
 }
 
 @Composable
-private fun EmptyCard(strings: Strings) {
+private fun EmptyCard() {
     SectionCard {
         Text(
-            text = strings.browsersEmpty,
+            text = stringResource(Res.string.browsers_empty),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -689,16 +709,16 @@ private fun EmptyCard(strings: Strings) {
 }
 
 @Composable
-private fun ErrorCard(strings: Strings, message: String, onRetry: () -> Unit) {
+private fun ErrorCard(message: String, onRetry: () -> Unit) {
     SectionCard {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = strings.browsersErrorPrefix + message,
+                text = stringResource(Res.string.browsers_error_prefix) + message,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error,
             )
             OutlinedButton(onClick = onRetry, shape = RoundedCornerShape(6.dp)) {
-                Text(strings.retry)
+                Text(stringResource(Res.string.retryStr))
             }
         }
     }
@@ -708,7 +728,6 @@ private fun ErrorCard(strings: Strings, message: String, onRetry: () -> Unit) {
 private fun BrowserList(
     browsers: List<Browser>,
     excluded: Set<BrowserId>,
-    strings: Strings,
     onToggle: (BrowserId, Boolean) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
@@ -718,7 +737,11 @@ private fun BrowserList(
     }
 
     Column {
-        SearchField(query = query, onChange = { query = it }, placeholder = strings.searchBrowsers)
+        SearchField(
+            query = query,
+            onChange = { query = it },
+            placeholder = stringResource(Res.string.search_browsers),
+        )
         Spacer(Modifier.height(12.dp))
         Column(
             modifier = Modifier
@@ -738,7 +761,6 @@ private fun BrowserList(
                 BrowserRow(
                     browser = browser,
                     isExcluded = id in excluded,
-                    strings = strings,
                     onToggle = { newValue -> onToggle(id, newValue) },
                 )
                 if (index != visible.lastIndex) {
@@ -759,7 +781,6 @@ private fun BrowserList(
 private fun BrowserRow(
     browser: Browser,
     isExcluded: Boolean,
-    strings: Strings,
     onToggle: (Boolean) -> Unit,
 ) {
     Row(
@@ -791,7 +812,11 @@ private fun BrowserRow(
             )
         }
         Text(
-            text = if (isExcluded) strings.excluded else strings.included,
+            text = if (isExcluded) {
+                stringResource(Res.string.excludedStr)
+            } else {
+                stringResource(Res.string.includedStr)
+            },
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
             color = if (isExcluded) {
                 MaterialTheme.colorScheme.error
@@ -880,7 +905,7 @@ private fun SearchField(
 private fun <T> EnumDropdown(
     value: T,
     options: List<T>,
-    optionLabel: (T) -> String,
+    optionLabel: @Composable (T) -> String,
     onSelected: (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
