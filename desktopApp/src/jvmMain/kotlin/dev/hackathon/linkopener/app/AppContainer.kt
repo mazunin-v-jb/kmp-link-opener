@@ -22,6 +22,7 @@ import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
+import dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.AutoStartManager
@@ -96,6 +97,8 @@ class AppContainer {
     val removeManualBrowserUseCase: RemoveManualBrowserUseCase =
         RemoveManualBrowserUseCase(settingsRepository)
     val setRulesUseCase: SetRulesUseCase = SetRulesUseCase(settingsRepository)
+    val setShowBrowserProfilesUseCase: SetShowBrowserProfilesUseCase =
+        SetShowBrowserProfilesUseCase(settingsRepository)
 
     private val ruleEngine: RuleEngine = RuleEngine(
         debug = DEBUG_LOGGING,
@@ -178,6 +181,7 @@ class AppContainer {
         addManualBrowser = addManualBrowserUseCase,
         removeManualBrowser = removeManualBrowserUseCase,
         setRules = setRulesUseCase,
+        setShowBrowserProfiles = setShowBrowserProfilesUseCase,
         discoverBrowsers = discoverBrowsersUseCase,
         observeIsDefaultBrowser = observeIsDefaultBrowserUseCase,
         getIsDefaultBrowser = getIsDefaultBrowserUseCase,

@@ -308,6 +308,37 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
+    fun showBrowserProfilesDefaultsTrueWhenAbsent() = runTest {
+        val repo = newRepo()
+        assertEquals(true, repo.settings.value.showBrowserProfiles)
+    }
+
+    @Test
+    fun setShowBrowserProfilesPersistsAndEmits() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+
+        repo.setShowBrowserProfiles(false)
+
+        assertFalse(repo.settings.value.showBrowserProfiles)
+        assertFalse(store.getBoolean("settings.showBrowserProfiles", true))
+    }
+
+    @Test
+    fun setShowBrowserProfilesIsIdempotent() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+
+        // Default is true; setting true again is a no-op (no write, no flow churn).
+        repo.setShowBrowserProfiles(true)
+        assertEquals(true, repo.settings.value.showBrowserProfiles)
+        repo.setShowBrowserProfiles(false)
+        assertFalse(repo.settings.value.showBrowserProfiles)
+        repo.setShowBrowserProfiles(false)
+        assertFalse(repo.settings.value.showBrowserProfiles)
+    }
+
+    @Test
     fun corruptedExclusionsJsonFallsBackToEmpty() = runTest {
         val store = FakeSettings()
         store.putString("settings.exclusions", "not-a-json")

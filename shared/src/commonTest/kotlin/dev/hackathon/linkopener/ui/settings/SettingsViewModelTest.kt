@@ -70,6 +70,48 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun onShowBrowserProfilesChangedTogglesAndReloads() = runTest {
+        val repo = FakeSettingsRepository()
+        // Discovery returns Chrome with two profile rows already expanded
+        // (as MacOsBrowserDiscovery would). Use a real BrowserRepositoryImpl
+        // wired against the settings flow so the collapse policy applies.
+        val chromePersonal = Browser(
+            bundleId = "com.google.Chrome", displayName = "Google Chrome",
+            applicationPath = "/Applications/Google Chrome.app", version = "131",
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile("Default", "Personal"),
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Chromium,
+        )
+        val chromeWork = chromePersonal.copy(
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile("Profile 1", "Work"),
+        )
+        val browserRepo = dev.hackathon.linkopener.data.BrowserRepositoryImpl(
+            discovery = object : dev.hackathon.linkopener.platform.BrowserDiscovery {
+                override suspend fun discover() = listOf(chromePersonal, chromeWork)
+            },
+            settings = repo,
+        )
+        val vm = newViewModel(repo = repo, scope = this, browserRepository = browserRepo)
+        testScheduler.advanceUntilIdle()
+        // Default: profiles shown, both rows visible.
+        assertEquals(2, (vm.browsers.value as BrowsersState.Loaded).browsers.size)
+
+        vm.onShowBrowserProfilesChanged(false)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(false, repo.settings.value.showBrowserProfiles)
+        val collapsed = (vm.browsers.value as BrowsersState.Loaded).browsers
+        assertEquals(1, collapsed.size)
+        assertEquals(null, collapsed[0].profile)
+
+        // Flip back — profiles re-expand.
+        vm.onShowBrowserProfilesChanged(true)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(true, repo.settings.value.showBrowserProfiles)
+        assertEquals(2, (vm.browsers.value as BrowsersState.Loaded).browsers.size)
+    }
+
+    @Test
     fun onAutoStartChangedDelegatesToRepository() = runTest {
         val repo = FakeSettingsRepository()
         val vm = newViewModel(repo = repo, scope = this)
@@ -153,6 +195,7 @@ class SettingsViewModelTest {
                 ),
                 removeManualBrowser = RemoveManualBrowserUseCase(FakeSettingsRepository()),
                 setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(FakeSettingsRepository()),
+                setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
                 getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
@@ -429,6 +472,7 @@ class SettingsViewModelTest {
                 ),
                 removeManualBrowser = RemoveManualBrowserUseCase(FakeSettingsRepository()),
                 setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(FakeSettingsRepository()),
+                setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
                 getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
@@ -634,6 +678,7 @@ class SettingsViewModelTest {
         ),
         removeManualBrowser = RemoveManualBrowserUseCase(repo),
         setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(repo),
+        setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(repo),
         discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
         observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(defaultBrowserService),
         getIsDefaultBrowser = GetIsDefaultBrowserUseCase(defaultBrowserService),
@@ -706,6 +751,10 @@ class SettingsViewModelTest {
 
         override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) {
             _settings.update { it.copy(rules = rules) }
+        }
+
+        override suspend fun setShowBrowserProfiles(enabled: Boolean) {
+            _settings.update { it.copy(showBrowserProfiles = enabled) }
         }
     }
 

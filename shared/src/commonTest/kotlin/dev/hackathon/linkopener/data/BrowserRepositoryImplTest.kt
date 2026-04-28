@@ -9,6 +9,7 @@ import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.platform.BrowserDiscovery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -105,6 +106,74 @@ class BrowserRepositoryImplTest {
         assertEquals(listOf(custom), result)
     }
 
+    @Test
+    fun showBrowserProfilesTrueKeepsProfileRows() = runTest {
+        val chromePath = "/Applications/Google Chrome.app"
+        val chromePersonal = Browser(
+            bundleId = "com.google.Chrome", displayName = "Google Chrome",
+            applicationPath = chromePath, version = "131",
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile("Default", "Personal"),
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Chromium,
+        )
+        val chromeWork = chromePersonal.copy(
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile("Profile 1", "Work"),
+        )
+        val repo = BrowserRepositoryImpl(
+            CountingDiscovery(listOf(chromePersonal, chromeWork)),
+            FakeSettings(),  // default: showBrowserProfiles = true
+        )
+
+        val result = repo.getInstalledBrowsers()
+
+        assertEquals(listOf(chromePersonal, chromeWork), result)
+    }
+
+    @Test
+    fun showBrowserProfilesFalseCollapsesProfileRowsToOne() = runTest {
+        val chromePath = "/Applications/Google Chrome.app"
+        val chromePersonal = Browser(
+            bundleId = "com.google.Chrome", displayName = "Google Chrome",
+            applicationPath = chromePath, version = "131",
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile("Default", "Personal"),
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Chromium,
+        )
+        val chromeWork = chromePersonal.copy(
+            profile = dev.hackathon.linkopener.core.model.BrowserProfile("Profile 1", "Work"),
+        )
+        val repo = BrowserRepositoryImpl(
+            CountingDiscovery(listOf(chromePersonal, chromeWork)),
+            FakeSettings(initial = AppSettings(showBrowserProfiles = false)),
+        )
+
+        val result = repo.getInstalledBrowsers()
+
+        assertEquals(1, result.size)
+        // Profile field stripped; family + parent metadata preserved.
+        assertEquals(null, result[0].profile)
+        assertEquals(dev.hackathon.linkopener.core.model.BrowserFamily.Chromium, result[0].family)
+        assertEquals("Google Chrome", result[0].displayName)
+        assertEquals(chromePath, result[0].applicationPath)
+    }
+
+    @Test
+    fun showBrowserProfilesFalseDoesNotTouchSingleProfileBrowsers() = runTest {
+        // Browser without a profile (single-profile Chromium / Safari / manual)
+        // pass through untouched whether toggle is on or off.
+        val safari = Browser(
+            bundleId = "com.apple.Safari", displayName = "Safari",
+            applicationPath = "/Applications/Safari.app", version = "17",
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Safari,
+        )
+        val repo = BrowserRepositoryImpl(
+            CountingDiscovery(listOf(safari)),
+            FakeSettings(initial = AppSettings(showBrowserProfiles = false)),
+        )
+
+        val result = repo.getInstalledBrowsers()
+
+        assertEquals(listOf(safari), result)
+    }
+
     private class CountingDiscovery(private val value: List<Browser>) : BrowserDiscovery {
         var callCount = 0
             private set
@@ -137,5 +206,8 @@ class BrowserRepositoryImplTest {
         override suspend fun addManualBrowser(browser: Browser) = error("not used")
         override suspend fun removeManualBrowser(id: BrowserId) = error("not used")
         override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) = error("not used")
+        override suspend fun setShowBrowserProfiles(enabled: Boolean) {
+            _settings.update { it.copy(showBrowserProfiles = enabled) }
+        }
     }
 }

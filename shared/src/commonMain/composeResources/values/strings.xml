@@ -48,6 +48,8 @@
     <string name="rule_no_browsers">No browsers available — discover or add some first.</string>
     <string name="rule_no_rules">No rules yet. Click "+ Add rule…" to make every link to a domain open in a specific browser.</string>
     <string name="rule_remove_content_description">Remove rule</string>
+    <string name="show_browser_profiles_title">Show browser profiles</string>
+    <string name="show_browser_profiles_description">When off, multi-profile browsers like Chrome show as one row. Rules and exclusions referencing specific profiles will not match while disabled.</string>
     <string name="system_default">System Default</string>
     <string name="empty_browsers_message">No installed browsers detected yet.</string>
 

@@ -116,6 +116,8 @@ import kmp_link_opener.shared.generated.resources.section_default_browser
 import kmp_link_opener.shared.generated.resources.section_language
 import kmp_link_opener.shared.generated.resources.section_system
 import kmp_link_opener.shared.generated.resources.settings_title
+import kmp_link_opener.shared.generated.resources.show_browser_profiles_description
+import kmp_link_opener.shared.generated.resources.show_browser_profiles_title
 import kmp_link_opener.shared.generated.resources.start_at_login
 import kmp_link_opener.shared.generated.resources.start_at_login_description
 import kmp_link_opener.shared.generated.resources.theme_mode
@@ -203,7 +205,12 @@ fun SettingsScreen(
                         )
                         NavSection.Appearance -> AppearanceSection(settings.theme, viewModel::onThemeSelected)
                         NavSection.Language -> LanguageSection(settings.language, viewModel::onLanguageSelected)
-                        NavSection.System -> SystemSection(settings.autoStartEnabled, viewModel::onAutoStartChanged)
+                        NavSection.System -> SystemSection(
+                            autoStart = settings.autoStartEnabled,
+                            onAutoStartChange = viewModel::onAutoStartChanged,
+                            showBrowserProfiles = settings.showBrowserProfiles,
+                            onShowBrowserProfilesChange = viewModel::onShowBrowserProfilesChanged,
+                        )
                         NavSection.Exclusions -> ExclusionsSection(
                             browsersState = browsers,
                             excluded = settings.excludedBrowserIds,
@@ -700,41 +707,66 @@ private fun LanguageSection(
 @Composable
 private fun SystemSection(
     autoStart: Boolean,
-    onChange: (Boolean) -> Unit,
+    onAutoStartChange: (Boolean) -> Unit,
+    showBrowserProfiles: Boolean,
+    onShowBrowserProfilesChange: (Boolean) -> Unit,
 ) {
     SectionPane(stringResource(Res.string.section_system), AppIcons.SettingsSuggest) {
         SectionCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(Res.string.start_at_login),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(Res.string.start_at_login_description),
-                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.width(16.dp))
-                Switch(
-                    checked = autoStart,
-                    onCheckedChange = onChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = MaterialTheme.colorScheme.primary,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                )
-            }
+            ToggleRow(
+                title = stringResource(Res.string.start_at_login),
+                description = stringResource(Res.string.start_at_login_description),
+                checked = autoStart,
+                onCheckedChange = onAutoStartChange,
+            )
         }
+        SectionCard {
+            ToggleRow(
+                title = stringResource(Res.string.show_browser_profiles_title),
+                description = stringResource(Res.string.show_browser_profiles_description),
+                checked = showBrowserProfiles,
+                onCheckedChange = onShowBrowserProfilesChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
+        )
     }
 }
 

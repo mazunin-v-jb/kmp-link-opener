@@ -40,6 +40,8 @@
     <string name="rule_no_browsers">Нет доступных браузеров — сначала найди или добавь хотя бы один.</string>
     <string name="rule_no_rules">Правил пока нет. Нажми «+ Добавить правило…», чтобы все ссылки на домен открывались в конкретном браузере.</string>
     <string name="rule_remove_content_description">Удалить правило</string>
+    <string name="show_browser_profiles_title">Показывать профили браузеров</string>
+    <string name="show_browser_profiles_description">Когда выключено, мультипрофильные браузеры (Chrome и др.) показываются одной строкой. Правила и исключения, привязанные к конкретным профилям, не сматчатся пока флаг выключен.</string>
     <string name="system_default">По умолчанию в системе</string>
     <string name="empty_browsers_message">Установленные браузеры пока не найдены.</string>
 

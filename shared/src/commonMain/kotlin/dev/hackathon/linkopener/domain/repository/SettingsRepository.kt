@@ -19,4 +19,5 @@ interface SettingsRepository {
     suspend fun addManualBrowser(browser: Browser)
     suspend fun removeManualBrowser(id: BrowserId)
     suspend fun setRules(rules: List<UrlRule>)
+    suspend fun setShowBrowserProfiles(enabled: Boolean)
 }

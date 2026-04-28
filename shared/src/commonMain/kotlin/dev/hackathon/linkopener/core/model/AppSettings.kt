@@ -11,6 +11,11 @@ data class AppSettings(
     val browserOrder: List<BrowserId> = emptyList(),
     val manualBrowsers: List<Browser> = emptyList(),
     val rules: List<UrlRule> = emptyList(),
+    // Stage 047 toggle: when false, Chromium browsers with N≥2 profiles are
+    // collapsed into a single row in `BrowserRepositoryImpl` instead of being
+    // shown as N rows. Default `true` keeps post-stage-046 behaviour intact
+    // for users who already saw the per-profile rows.
+    val showBrowserProfiles: Boolean = true,
 ) {
     companion object {
         val Default = AppSettings()

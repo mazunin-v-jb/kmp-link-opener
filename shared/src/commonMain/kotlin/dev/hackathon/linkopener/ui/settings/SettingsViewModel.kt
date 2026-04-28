@@ -19,6 +19,7 @@ import dev.hackathon.linkopener.core.model.UrlRule
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
+import dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import kotlinx.coroutines.CancellationException
@@ -39,6 +40,7 @@ class SettingsViewModel(
     private val addManualBrowser: AddManualBrowserUseCase,
     private val removeManualBrowser: RemoveManualBrowserUseCase,
     private val setRules: SetRulesUseCase,
+    private val setShowBrowserProfiles: SetShowBrowserProfilesUseCase,
     private val discoverBrowsers: DiscoverBrowsersUseCase,
     observeIsDefaultBrowser: ObserveIsDefaultBrowserUseCase,
     private val getIsDefaultBrowser: GetIsDefaultBrowserUseCase,
@@ -114,6 +116,19 @@ class SettingsViewModel(
 
     fun onAutoStartChanged(enabled: Boolean) {
         scope.launch { setAutoStart(enabled) }
+    }
+
+    /**
+     * Stage 047 toggle. Persists the new value, then triggers a browser
+     * reload so the Settings list and (next time) the picker reflect the
+     * collapsed or expanded shape immediately — `BrowserRepositoryImpl`
+     * applies the new policy on the next `getInstalledBrowsers` call.
+     */
+    fun onShowBrowserProfilesChanged(enabled: Boolean) {
+        scope.launch {
+            setShowBrowserProfiles(enabled)
+            loadBrowsers(forceRefresh = false)
+        }
     }
 
     fun onBrowserExclusionToggled(id: BrowserId, excluded: Boolean) {

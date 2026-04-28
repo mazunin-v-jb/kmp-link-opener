@@ -16,13 +16,16 @@ class BrowserRepositoryImpl(
 
     override suspend fun getInstalledBrowsers(): List<Browser> = mutex.withLock {
         val discovered = cachedDiscovered ?: discovery.discover().also { cachedDiscovered = it }
-        mergeWithManual(discovered)
+        finalize(discovered)
     }
 
     override suspend fun refresh(): List<Browser> = mutex.withLock {
         val discovered = discovery.discover().also { cachedDiscovered = it }
-        mergeWithManual(discovered)
+        finalize(discovered)
     }
+
+    private fun finalize(discovered: List<Browser>): List<Browser> =
+        collapseProfilesIfDisabled(mergeWithManual(discovered))
 
     /**
      * Combines auto-discovered browsers with the user's manually-added ones.
@@ -37,5 +40,27 @@ class BrowserRepositoryImpl(
         val seen = discovered.mapTo(HashSet()) { it.applicationPath }
         val extras = manual.filterNot { it.applicationPath in seen }
         return discovered + extras
+    }
+
+    /**
+     * Stage 047 toggle: when `showBrowserProfiles == false`, profile-expanded
+     * Chromium rows (one per `Local State` profile) are folded back into a
+     * single row per parent applicationPath. The fold drops the `profile`
+     * field but preserves the rest of the parent metadata. Single point of
+     * decision so flipping the policy or going per-browser later only
+     * touches this method.
+     */
+    private fun collapseProfilesIfDisabled(list: List<Browser>): List<Browser> {
+        if (settings.settings.value.showBrowserProfiles) return list
+        // Group by applicationPath; if a group has any profile rows, emit one
+        // representative without `profile`. Single-row groups pass through.
+        val byPath = list.groupBy { it.applicationPath }
+        return byPath.flatMap { (_, group) ->
+            when {
+                group.size == 1 -> group
+                group.any { it.profile != null } -> listOf(group.first().copy(profile = null))
+                else -> group
+            }
+        }
     }
 }

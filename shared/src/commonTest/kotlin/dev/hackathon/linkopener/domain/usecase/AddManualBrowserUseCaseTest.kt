@@ -148,5 +148,8 @@ class AddManualBrowserUseCaseTest {
         override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) {
             _settings.update { it.copy(rules = rules) }
         }
+        override suspend fun setShowBrowserProfiles(enabled: Boolean) {
+            _settings.update { it.copy(showBrowserProfiles = enabled) }
+        }
     }
 }

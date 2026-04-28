@@ -80,6 +80,12 @@ class SettingsRepositoryImpl(
         _settings.update { it.copy(rules = rules) }
     }
 
+    override suspend fun setShowBrowserProfiles(enabled: Boolean) {
+        if (enabled == _settings.value.showBrowserProfiles) return
+        store.putBoolean(KEY_SHOW_PROFILES, enabled)
+        _settings.update { it.copy(showBrowserProfiles = enabled) }
+    }
+
     private fun load(): AppSettings = AppSettings(
         theme = readEnum(KEY_THEME, AppTheme.entries, AppTheme.System),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
@@ -88,6 +94,7 @@ class SettingsRepositoryImpl(
         browserOrder = decodeOrder(store.getStringOrNull(KEY_BROWSER_ORDER)),
         manualBrowsers = decodeManual(store.getStringOrNull(KEY_MANUAL_BROWSERS)),
         rules = decodeRules(store.getStringOrNull(KEY_RULES)),
+        showBrowserProfiles = store.getBoolean(KEY_SHOW_PROFILES, true),
     )
 
     private fun <E : Enum<E>> readEnum(key: String, values: List<E>, default: E): E {
@@ -146,5 +153,6 @@ class SettingsRepositoryImpl(
         const val KEY_BROWSER_ORDER = "settings.browserOrder"
         const val KEY_MANUAL_BROWSERS = "settings.manualBrowsers"
         const val KEY_RULES = "settings.rules"
+        const val KEY_SHOW_PROFILES = "settings.showBrowserProfiles"
     }
 }
