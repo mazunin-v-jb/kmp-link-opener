@@ -82,19 +82,32 @@ object MacOsAlwaysOnTopOverFullScreen {
     }
 
     private fun nsWindowPointer(window: Window): Pointer? {
-        // Component.peer is private; AWTAccessor is the supported back-door.
+        // 1. Get the ComponentAccessor instance from AWTAccessor's static factory.
         val accessor = Class.forName("sun.awt.AWTAccessor")
             .getMethod("getComponentAccessor")
             .invoke(null)
-        val getPeer = accessor.javaClass.getMethod("getPeer", Component::class.java)
+            ?: return null
+
+        // 2. Call ComponentAccessor.getPeer(window). Look up `getPeer` via the
+        //    interface class (sun.awt.AWTAccessor$ComponentAccessor — in an
+        //    exported/opened package), NOT via accessor.javaClass — the
+        //    runtime impl is `java.awt.Component$1`, an anonymous inner class
+        //    in java.awt, and reflection on it from an unnamed module hits
+        //    "cannot access member of class java.awt.Component$1".
+        val componentAccessorCls = Class.forName("sun.awt.AWTAccessor\$ComponentAccessor")
+        val getPeer = componentAccessorCls.getMethod("getPeer", Component::class.java)
         val peer = getPeer.invoke(accessor, window) ?: return null
 
-        // peer is sun.lwawt.LWWindowPeer
-        val getPlatformWindow = peer.javaClass.getMethod("getPlatformWindow")
+        // 3. peer is a subclass of sun.lwawt.LWWindowPeer. Look up
+        //    getPlatformWindow on the parent class (also exported/opened) to
+        //    sidestep any private subtype the same way.
+        val lwWindowPeerCls = Class.forName("sun.lwawt.LWWindowPeer")
+        val getPlatformWindow = lwWindowPeerCls.getMethod("getPlatformWindow")
         val platformWindow = getPlatformWindow.invoke(peer) ?: return null
 
-        // platformWindow is sun.lwawt.macosx.CPlatformWindow extends CFRetainedResource;
-        // CFRetainedResource exposes the native NSWindow* through `ptr`.
+        // 4. platformWindow is sun.lwawt.macosx.CPlatformWindow extends
+        //    CFRetainedResource. CFRetainedResource exposes the native
+        //    NSWindow* through its private `ptr` field.
         val cfRetainedResourceCls = Class.forName("sun.lwawt.macosx.CFRetainedResource")
         val ptrField = cfRetainedResourceCls.getDeclaredField("ptr")
         ptrField.isAccessible = true
