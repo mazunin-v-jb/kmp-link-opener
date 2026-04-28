@@ -2,6 +2,26 @@
 
 Кроссплатформенный «открыватель ссылок». Работает на macOS, Windows и Linux, написан на Kotlin (Compose Multiplatform + Kotlin Multiplatform). Регистрируется в системе как браузер; при клике на ссылку показывает попап выбора браузера.
 
+> **Статус (актуальный).** Основной канон — таблица в [`CLAUDE.md`](../CLAUDE.md). Кратко:
+>
+> | Стадия | Что | macOS |
+> |---|---|---|
+> | 1 | Tray + Settings skeleton, ручной DI | ✅ |
+> | 2 | Browser discovery (filesystem + `plutil`) | ✅ |
+> | 3a | Регистрация как default-browser handler, приём URL | ✅ |
+> | 3 (close) | `MacOsLinkLauncher` — реальный `open -a` | ✅ |
+> | 4 | Settings persistence (тема/язык/autostart/exclusions) | ✅ |
+> | 4.1 | Детекция default-browser (live через WatchService) + deep-link в System Settings + переписанный сайдбар | ✅ |
+> | 4.2 | Browser picker popup (3 + «Show all», drag, scroll, dismiss-outside) | ✅ |
+> | 4.5 | Дизайн-система (M3 colors / typography / brand-icon) | ✅ |
+> | 5 | i18n через Compose Resources XML + locale-flip на click thread | ✅ |
+>
+> **В работе/будущее:** стадия 6 (custom rules), 7 (Windows), 8 (Linux).
+>
+> Тех-долг — в [`../TECHDEBT.md`](../TECHDEBT.md). Расхождения между планами и финальной реализацией задокументированы в секциях «Implementation notes» внутри каждого `ai_stages/<NN>_*/plan.md`.
+>
+> Раздел ниже — оригинальный мастер-план до начала работы. Сохранён как исторический контекст и форвард-лукинг для стадий 6/7/8. Часть листингов (`core/result/`, `data/rules/`, `ui/strings/Strings.kt` и пр.) — это «целевая» структура; реальное состояние см. в README + CLAUDE.md.
+
 ## Целевые платформы
 
 - **macOS** — стадия 1 (приоритет)

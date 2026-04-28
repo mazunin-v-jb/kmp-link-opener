@@ -114,3 +114,12 @@ class GetCanOpenSystemSettingsUseCase(service): operator fun invoke(): Boolean  
 ## Чувствительные данные
 
 Нет.
+
+## Implementation notes (расхождения с тем, что в main)
+
+Стадия закрыта в `a28402f Stage/04.1 default browser and discovery wiring (#3)`, далее доработана в `cd5fbef DefaultBrowserService: live observation via Flow + WatchService on macOS`. Что отличается от плана:
+
+- **Live observation вместо разовой проверки.** План предлагал `IsDefaultBrowserUseCase` + `recheckDefaultBrowser()` по необходимости. На main работает `ObserveIsDefaultBrowserUseCase` поверх `DefaultBrowserService.observeIsDefaultBrowser(): Flow<Boolean>`. macOS-импл подписывается через `java.nio.file.WatchService` на изменение `~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist` и эмитит свежий `isDefaultBrowser()` при каждом write. SettingsViewModel держит `StateFlow<Boolean>`, баннер «not default» прячется/появляется автоматически, без явных recheck-вызовов.
+- `IsDefaultBrowserUseCase.kt` ещё лежит в `domain/usecase/`, но в графе DI больше не используется (см. `AppContainer`, `SettingsViewModel`). Можно безопасно удалить — отмечено в `TECHDEBT.md`.
+- **`Crossfade(activeSection)`** заменён на обычное `when (activeSection)` в стадии 5: Crossfade кеширует per-targetState и не давал пересчитать строки при смене языка. Поведение визуально то же (моргания нет — сабтри маленькие).
+- Acceptance criteria все выполнены, плюс баннер обновляется в realtime (без manual refresh) — это бонус относительно плана.

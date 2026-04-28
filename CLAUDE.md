@@ -15,9 +15,18 @@ Status as of latest main:
 | 3a | Register as default-browser handler, receive URLs | ✅ |
 | 3 (close) | `MacOsLinkLauncher` — real `open -a` | ✅ |
 | 4 | Settings persistence (theme/lang/autostart/exclusions) | ✅ |
-| 4.1 | Default-browser detection + System Settings deep-link | ✅ (real plist read) |
-| 4.2 | Browser picker popup window | ✅ |
+| 4.1 | Default-browser detection + System Settings deep-link | ✅ (live via WatchService → `Flow<Boolean>`) |
+| 4.2 | Browser picker popup window | ✅ (drag handle + scrolling expanded list + dismiss-outside) |
 | 4.5 | Design system (colors, typography, icons, theme) | ✅ |
+| 5 | i18n via Compose Resources XML + JVM-locale override | ✅ |
+
+**Stages still open:** 6 (custom URL→browser rules), 7 (Windows registry / default-app registration), 8 (Linux `.desktop` + `xdg-mime`).
+
+Recent additions worth knowing about for context:
+
+- `DefaultBrowserService.observeIsDefaultBrowser(): Flow<Boolean>` — macOS impl watches the LaunchServices preferences plist via `WatchService` so the Settings UI banner flips the moment the user picks a different default elsewhere. Driven by `ObserveIsDefaultBrowserUseCase`. The older `IsDefaultBrowserUseCase` still exists in `domain/usecase/` but nothing in the live graph references it — fair game to delete.
+- Picker popup polish: header doubles as a `WindowDraggableArea` drag handle; "Show all" grows the popup from 320 → 480 dp and the full browser list lives in a vertically-scrolled `Column` capped at 6 row heights with a `VerticalScrollbar`. `BrowserPickerScreen` exposes `onExpand` + `headerWrapper` slot so the JVM-only `WindowDraggableArea` plumbing stays in `:desktopApp`.
+- Stage-5 locale strategy diverged from the original plan: instead of `key(resolvedLocale) + DisposableEffect`, we apply `Locale.setDefault` synchronously on the click thread (in `SettingsViewModel.onLanguageSelected`) plus at `AppContainer.init` for the loaded language, and use `LocalAppLocale` (a CompositionLocal nonce) to break Compose's smart-skipping in TopAppBar / NotDefaultBanner / Sidebar. See `ai_stages/05_compose_resources_i18n/plan.md` "Implementation notes" for why.
 
 ## Workflow rules (from `prompts/1_Prompt.md`)
 
@@ -122,7 +131,17 @@ Other notable deps: `kotlinx-coroutines` (with `kotlinx-coroutines-swing` for th
 
 ## Test coverage
 
-Kover is wired on `:shared`. Several classes are explicitly excluded because they're process-spawning / framework-glue layers that we'd only smoke-test on the matching OS:
+Kover is wired on `:shared`. 116 jvm tests are green on main. Current numbers (run `./gradlew :shared:koverHtmlReport` to refresh):
+
+| Metric | Latest main |
+| --- | --- |
+| Class | 75.7% |
+| Method | 40.4% |
+| Branch | 46.1% |
+| Line | 34.2% |
+| Instruction | 30.2% |
+
+The line/method drop versus the earlier 92.5% / 71.1% peak is real — UI surface grew (BrowserPickerScreen, BrowsersState, NavSection variants, banner code, picker chrome) without unit tests, and most of that surface isn't excluded from Kover. The set of *intentionally* excluded classes is still:
 
 - `JvmUrlReceiver` (wraps `Desktop.setOpenURIHandler`)
 - `PlutilRunner` (`ProcessBuilder` to `/usr/bin/plutil`)
@@ -131,6 +150,8 @@ Kover is wired on `:shared`. Several classes are explicitly excluded because the
 - A few stage 4.5 UI scaffolding classes (Compose UI is exercised by the design system, not unit-tested)
 
 The Linux default-browser service IS unit-tested because it's a no-op stub. Smoke tests for macOS-only logic guard themselves with `Assume.assumeTrue("…", isMacOs)` so jvmTest stays portable.
+
+Tracked as the "UI-surface coverage gap" item in `TECHDEBT.md`. Decide per UI piece whether to (a) extend the Kover excludes list to match its real role as untested chrome, or (b) actually add tests with compose-ui-test.
 
 ## Things to leave alone
 
