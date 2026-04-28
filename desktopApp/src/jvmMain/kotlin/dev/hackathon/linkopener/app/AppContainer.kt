@@ -105,6 +105,13 @@ class AppContainer {
         log = ::println,
     )
 
+    // Captured BEFORE any Locale.setDefault call so AppLanguage.System always
+    // resolves to the OS-level locale, not whatever the user most recently
+    // picked. Without this, switching En → System (or Ru → System) would
+    // sticky-stay on the previous override because applyJvmLocale would read
+    // its own override back from Locale.getDefault().
+    private val systemLanguageTag: String = java.util.Locale.getDefault().language
+
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
         DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
     val observeIsDefaultBrowserUseCase: ObserveIsDefaultBrowserUseCase =
@@ -192,19 +199,11 @@ class AppContainer {
     )
 
     // Translates user-selected AppLanguage into the JVM Locale.getDefault()
-    // override that Compose Resources reads through. Falls back to "en" for
-    // the System mode when the host locale isn't one of our supported
-    // languages.
+    // override that Compose Resources reads through. Resolution itself is
+    // delegated to the pure [resolveLocaleTag] helper so it can be unit-tested
+    // without touching the global JVM Locale.
     private fun applyJvmLocale(language: dev.hackathon.linkopener.core.model.AppLanguage) {
-        val tag = when (language) {
-            dev.hackathon.linkopener.core.model.AppLanguage.En -> "en"
-            dev.hackathon.linkopener.core.model.AppLanguage.Ru -> "ru"
-            dev.hackathon.linkopener.core.model.AppLanguage.System -> {
-                val systemTag = java.util.Locale.getDefault().language
-                if (systemTag == "ru") "ru" else "en"
-            }
-        }
-        val target = java.util.Locale.forLanguageTag(tag)
+        val target = java.util.Locale.forLanguageTag(resolveLocaleTag(language, systemLanguageTag))
         if (java.util.Locale.getDefault() != target) {
             java.util.Locale.setDefault(target)
         }
@@ -216,4 +215,24 @@ class AppContainer {
         // dump and any other diagnostic prints in stdout.
         val DEBUG_LOGGING: Boolean = System.getProperty("linkopener.debug") == "true"
     }
+}
+
+/**
+ * Resolves an [AppLanguage] selection to the BCP-47 language tag that should
+ * become `Locale.getDefault()`. The OS locale is passed in explicitly
+ * ([systemLanguageTag]) so this stays pure — callers must capture it once,
+ * before any `Locale.setDefault` happens, otherwise switching back to
+ * `System` after the user picked En/Ru would re-resolve to the prior
+ * override instead of the actual OS locale.
+ *
+ * Supported tags are `en` and `ru`; any other system tag falls back to `en`.
+ */
+internal fun resolveLocaleTag(
+    language: dev.hackathon.linkopener.core.model.AppLanguage,
+    systemLanguageTag: String,
+): String = when (language) {
+    dev.hackathon.linkopener.core.model.AppLanguage.En -> "en"
+    dev.hackathon.linkopener.core.model.AppLanguage.Ru -> "ru"
+    dev.hackathon.linkopener.core.model.AppLanguage.System ->
+        if (systemLanguageTag == "ru") "ru" else "en"
 }
