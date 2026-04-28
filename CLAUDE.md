@@ -153,15 +153,15 @@ Other notable deps: `kotlinx-coroutines` (with `kotlinx-coroutines-swing` for th
 
 ## Test coverage
 
-Kover is wired on `:shared`. 133 jvm tests are green on main. Current numbers (run `./gradlew :shared:koverHtmlReport` to refresh):
+Kover is wired on `:shared`. 213 jvm tests are green on main. Current numbers (run `./gradlew :shared:koverHtmlReport` to refresh):
 
 | Metric | Latest main |
 | --- | --- |
-| Class | 97.1% |
-| Method | 97.8% |
-| Branch | 68.4% |
-| Line | 97.6% |
-| Instruction | 93.5% |
+| Class | 99.0% |
+| Method | 99.0% |
+| Branch | 72.4% |
+| Line | 98.3% |
+| Instruction | 94.7% |
 
 The set of *intentionally* excluded classes:
 

@@ -84,6 +84,23 @@ class MacOsLinkLauncherTest {
     }
 
     @Test
+    fun defaultProcessFactorySpawnsRealProcessOnMacOs() = runTest {
+        // macOS-only: exercise the constructor's default `processFactory` so
+        // the bytecode for that lambda is actually executed in coverage. We
+        // hand it a non-existent .app — `open` prints "The file ... does not
+        // exist" to stderr (visible because of inheritIO) and exits non-zero,
+        // so launcher.openIn returns false. The point is just to invoke the
+        // default factory without throwing.
+        org.junit.Assume.assumeTrue("requires macOS host", System.getProperty("os.name").orEmpty().lowercase().let {
+            "mac" in it || "darwin" in it
+        })
+        val launcher = MacOsLinkLauncher() // default processFactory
+        val nonExistent = safari.copy(applicationPath = "/Applications/__nonexistent_for_test__.app")
+        val launched = launcher.openIn(nonExistent, "https://example.com")
+        assertFalse(launched)
+    }
+
+    @Test
     fun urlSpecialCharactersArePassedThroughVerbatim() = runTest {
         val captured = mutableListOf<List<String>>()
         val launcher = MacOsLinkLauncher(processFactory = { args ->

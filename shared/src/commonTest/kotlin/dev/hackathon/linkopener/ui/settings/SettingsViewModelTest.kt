@@ -381,6 +381,72 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun onManualBrowserPickedSelfRaisesIsSelfNotice() = runTest {
+        val repo = FakeSettingsRepository()
+        // Extractor returns the bundle id matching `ownBundleId` injected
+        // into newViewModel's AddManualBrowserUseCase ("dev.hackathon.linkopener").
+        val self = Browser(
+            bundleId = "dev.hackathon.linkopener",
+            displayName = "Link Opener",
+            applicationPath = "/Applications/Link Opener.app",
+            version = "0.1.0",
+        )
+        val vm = newViewModel(
+            repo = repo,
+            scope = this,
+            extractor = object : BrowserMetadataExtractor {
+                override suspend fun extract(path: String) =
+                    BrowserMetadataExtractor.ExtractResult.Success(self)
+            },
+        )
+
+        vm.onManualBrowserPicked("/Applications/Link Opener.app")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(ManualAddNotice.IsSelf, vm.manualAddNotice.value)
+        assertEquals(emptyList(), repo.settings.value.manualBrowsers)
+    }
+
+    @Test
+    fun observerFlowFailureFallsBackToFalse() = runTest {
+        // Exercises the `.catch { emit(false) }` recovery lambda in the VM's
+        // init block — only fires when observeIsDefaultBrowser() throws.
+        val vmScope = CoroutineScope(coroutineContext + Job())
+        try {
+            val service = ThrowingObserveDefaultBrowserService()
+            val vm = SettingsViewModel(
+                getSettings = GetSettingsFlowUseCase(FakeSettingsRepository()),
+                updateTheme = UpdateThemeUseCase(FakeSettingsRepository()),
+                updateLanguage = UpdateLanguageUseCase(FakeSettingsRepository()),
+                setAutoStart = SetAutoStartUseCase(FakeSettingsRepository()),
+                setBrowserExcluded = SetBrowserExcludedUseCase(FakeSettingsRepository()),
+                setBrowserOrder = SetBrowserOrderUseCase(FakeSettingsRepository()),
+                addManualBrowser = AddManualBrowserUseCase(
+                    extractor = NoopExtractor,
+                    settings = FakeSettingsRepository(),
+                    browsers = StaticBrowserRepository(emptyList()),
+                    ownBundleId = "test",
+                ),
+                removeManualBrowser = RemoveManualBrowserUseCase(FakeSettingsRepository()),
+                setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(FakeSettingsRepository()),
+                discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
+                observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
+                getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
+                openDefaultBrowserSettings = OpenDefaultBrowserSettingsUseCase(service),
+                getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(service),
+                scope = vmScope,
+            )
+
+            testScheduler.advanceUntilIdle()
+            // Despite the observer flow throwing, the catch handler emits
+            // `false` and the indicator stays at the safe default.
+            assertEquals(false, vm.isDefaultBrowser.value)
+        } finally {
+            vmScope.cancel()
+        }
+    }
+
+    @Test
     fun dismissManualAddNoticeClearsState() = runTest {
         val repo = FakeSettingsRepository()
         val vm = newViewModel(
@@ -693,5 +759,18 @@ class SettingsViewModelTest {
         override fun observeIsDefaultBrowser(): kotlinx.coroutines.flow.Flow<Boolean> = state
         override suspend fun openSystemSettings(): Boolean = true
         fun emit(value: Boolean) { state.value = value }
+    }
+
+    /**
+     * Service whose [observeIsDefaultBrowser] flow throws on first collection,
+     * mimicking a (theoretical) WatchService crash. The VM's init `.catch`
+     * should swallow it and emit `false`.
+     */
+    private class ThrowingObserveDefaultBrowserService : DefaultBrowserService {
+        override val canOpenSystemSettings: Boolean = true
+        override suspend fun isDefaultBrowser(): Boolean = false
+        override fun observeIsDefaultBrowser(): kotlinx.coroutines.flow.Flow<Boolean> =
+            kotlinx.coroutines.flow.flow { error("simulated observer crash") }
+        override suspend fun openSystemSettings(): Boolean = true
     }
 }

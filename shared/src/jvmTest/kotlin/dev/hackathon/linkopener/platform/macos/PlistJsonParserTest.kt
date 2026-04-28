@@ -240,6 +240,61 @@ class PlistJsonParserTest {
     }
 
     @Test
+    fun parseAnyAppExtractsMetadataWithoutHttpCheck() {
+        // No CFBundleURLTypes — parseBrowser would reject this, but parseAnyApp
+        // (used by the manual-add flow) trusts the user's claim that the app is
+        // a link handler and just pulls metadata.
+        val json = """
+            {
+              "CFBundleIdentifier": "com.example.tool",
+              "CFBundleDisplayName": "Some Tool",
+              "CFBundleShortVersionString": "0.9"
+            }
+        """.trimIndent()
+
+        val browser = parser.parseAnyApp(json, Path("/Applications/Tool.app"))
+
+        assertNotNull(browser)
+        assertEquals("com.example.tool", browser.bundleId)
+        assertEquals("Some Tool", browser.displayName)
+        assertEquals("0.9", browser.version)
+    }
+
+    @Test
+    fun parseAnyAppReturnsNullOnMalformedJson() {
+        assertNull(parser.parseAnyApp("not even json", Path("/Applications/X.app")))
+    }
+
+    @Test
+    fun parseAnyAppReturnsNullWhenBundleIdentifierMissing() {
+        val json = """{"CFBundleName":"X"}"""
+        assertNull(parser.parseAnyApp(json, Path("/Applications/X.app")))
+    }
+
+    @Test
+    fun isLinkHandlerTrueWhenHttpDeclared() {
+        val json = """
+            {
+              "CFBundleIdentifier": "com.example.x",
+              "CFBundleURLTypes": [
+                { "CFBundleURLSchemes": ["http", "https"] }
+              ]
+            }
+        """.trimIndent()
+        assertEquals(true, parser.isLinkHandler(json))
+    }
+
+    @Test
+    fun isLinkHandlerFalseWhenNoUrlTypes() {
+        assertEquals(false, parser.isLinkHandler("""{"CFBundleIdentifier":"x"}"""))
+    }
+
+    @Test
+    fun isLinkHandlerFalseOnMalformedJson() {
+        assertEquals(false, parser.isLinkHandler("garbage"))
+    }
+
+    @Test
     fun skipsNonStringSchemeEntries() {
         // CFBundleURLSchemes contains a number alongside the http string. The number
         // entry must be skipped without throwing; the http entry still qualifies.

@@ -161,6 +161,60 @@ class RuleEngineTest {
     }
 
     @Test
+    fun ipv6LiteralHostIsExtractedWithBrackets() {
+        val engine = RuleEngine()
+        val decision = engine.resolve(
+            url = "https://[::1]:8080/path",
+            // Pattern matches the bracketed literal — that's what the parser yields.
+            rules = listOf(ruleFor(firefox, "[::1]")),
+            browsers = listOf(firefox),
+            exclusions = emptySet(),
+        )
+        assertIs<RuleDecision.Direct>(decision)
+    }
+
+    @Test
+    fun ipv6LiteralWithoutClosingBracketStillParsesAsHost() {
+        // Defensive — malformed IPv6 with no `]` should still produce a host
+        // (everything after the scheme), not crash.
+        val engine = RuleEngine()
+        val decision = engine.resolve(
+            url = "https://[::1/path",
+            rules = listOf(ruleFor(firefox, "*")),
+            browsers = listOf(firefox),
+            exclusions = emptySet(),
+        )
+        // `*` is greedy enough to match anything, including the malformed host.
+        assertIs<RuleDecision.Direct>(decision)
+    }
+
+    @Test
+    fun urlWithEmptyHostFallsThroughToPicker() {
+        val engine = RuleEngine()
+        // `https:///foo` — scheme + immediately path, no host.
+        val decision = engine.resolve(
+            url = "https:///foo",
+            rules = listOf(ruleFor(firefox, "*")),
+            browsers = listOf(firefox),
+            exclusions = emptySet(),
+        )
+        assertEquals(RuleDecision.Picker, decision)
+    }
+
+    @Test
+    fun urlWithFragmentOnlyAfterSchemeStripsCorrectly() {
+        // No path/query, just a fragment. Host should still be parsed.
+        val engine = RuleEngine()
+        val decision = engine.resolve(
+            url = "https://example.com#anchor",
+            rules = listOf(ruleFor(firefox, "example.com")),
+            browsers = listOf(firefox),
+            exclusions = emptySet(),
+        )
+        assertIs<RuleDecision.Direct>(decision)
+    }
+
+    @Test
     fun debugFalseProducesNoLogs() {
         val log = mutableListOf<String>()
         val engine = RuleEngine(debug = false, log = { log += it })
