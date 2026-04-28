@@ -64,6 +64,23 @@ Resolved items are removed (git log preserves history) — keep the list short s
 
 ---
 
+## TD-8 — Refresh button can show stale default-browser state
+
+**Where:** `shared/src/jvmMain/kotlin/dev/hackathon/linkopener/platform/macos/MacOsDefaultBrowserService.kt` (`isDefaultBrowser`); the user-facing trigger is the Settings refresh button wired through `SettingsViewModel.refresh()`.
+
+**What:** `isDefaultBrowser()` reads `~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist` via `plutil -convert json`. That `.plist` is *not* the live source of the default-browser binding — it is a snapshot of the Launch Services database that `lsd` (the Launch Services daemon) flushes to disk on its own schedule. Right after the user changes the default browser in System Settings, `lsd` updates its in-memory state instantly, but the on-disk `.plist` may not catch up for seconds (sometimes longer). Both the refresh button and the WatchService-driven live flow read the on-disk file, so both can report the previous value. We confirmed this empirically — switching to `defaults export <domain>` (which also goes through `cfprefsd`) returns the same stale data as `plutil`, ruling out cfprefsd caching as the culprit. The on-disk plist is just a stale snapshot of `lsd`.
+
+**Why it's still in the repo:** every implementation that *does* see live state requires reaching past the .plist. Two viable approaches:
+
+- **JNA → Launch Services API.** Call `LSCopyDefaultApplicationURLForURL(url, kLSRolesViewer, &err)` (or the newer `NSWorkspace.urlForApplicationToOpen:`) directly via JNA. We already depend on JNA. Cost: ~100–200 lines of bindings + manual `CFRelease` for `CFString`/`CFURL` returns + a small abstraction layer to keep the service unit-testable.
+- **Bundled Swift helper.** Ship a tiny native binary inside `Contents/Resources/` of the `.app`, exec it from Kotlin, parse stdout. No JNA / no CF memory management, but adds a Swift step to the build pipeline and ~100 KB to the bundle.
+
+The user-visible impact is "refresh button doesn't always reflect what System Settings just showed" — annoying but not load-bearing. Other paths (WatchService-driven live banner, picker behaviour, link-opening) all eventually catch up once `lsd` flushes.
+
+**Action:** when this becomes load-bearing (release polish, user complaints), pick one of the two approaches above. Until then the limitation is documented and the existing read path is left as-is. Diagnostic hint for anyone re-investigating: `defaults export com.apple.LaunchServices/com.apple.launchservices.secure - | plutil -convert json -r -o - -` returns the same data as our current path, so don't switch to it expecting magic.
+
+---
+
 ## How to add an entry
 
 1. Pick the next free number (don't reuse retired ones — they're a stable handle once written).
