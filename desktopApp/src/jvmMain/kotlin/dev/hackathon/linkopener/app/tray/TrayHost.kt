@@ -13,6 +13,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
+import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
 import dev.hackathon.linkopener.ui.strings.resolveStrings
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
@@ -37,6 +38,8 @@ fun ApplicationScope.TrayHost(
     val trayIconPainter = remember { loadTrayIconPainter() }
     val appIconPainter = remember { loadAppIconPainter() }
 
+    val pickerState by container.pickerCoordinator.state.collectAsState()
+
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
     Tray(
@@ -44,9 +47,29 @@ fun ApplicationScope.TrayHost(
         tooltip = strings.appName,
         menu = {
             Item(strings.trayMenuSettings, onClick = { settingsAnchor = currentCursorPosition() })
+            // TODO: remove the dev-only "Test picker" entry before public
+            //  release. It's here so the picker can be exercised without
+            //  packaging + installing the app as the OS default browser.
+            Item(
+                strings.trayMenuTestPicker,
+                onClick = { container.pickerCoordinator.handleIncomingUrl("https://example.com/?utm=picker-test") },
+            )
             Item(strings.trayMenuQuit, onClick = onExit)
         },
     )
+
+    val currentPickerState = pickerState
+    if (currentPickerState is PickerState.Showing) {
+        LinkOpenerTheme(theme = settings.theme) {
+            PickerWindow(
+                url = currentPickerState.url,
+                browsers = currentPickerState.browsers,
+                strings = strings,
+                onPick = container.pickerCoordinator::pickBrowser,
+                onDismiss = container.pickerCoordinator::dismiss,
+            )
+        }
+    }
 
     val anchor = settingsAnchor
     if (anchor != null) {
