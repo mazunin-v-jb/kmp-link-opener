@@ -15,8 +15,10 @@ import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.AddManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.RemoveManualBrowserUseCase
+import dev.hackathon.linkopener.core.model.UrlRule
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
+import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import kotlinx.coroutines.CancellationException
@@ -36,6 +38,7 @@ class SettingsViewModel(
     private val setBrowserOrder: SetBrowserOrderUseCase,
     private val addManualBrowser: AddManualBrowserUseCase,
     private val removeManualBrowser: RemoveManualBrowserUseCase,
+    private val setRules: SetRulesUseCase,
     private val discoverBrowsers: DiscoverBrowsersUseCase,
     observeIsDefaultBrowser: ObserveIsDefaultBrowserUseCase,
     private val getIsDefaultBrowser: GetIsDefaultBrowserUseCase,
@@ -153,6 +156,50 @@ class SettingsViewModel(
         scope.launch {
             removeManualBrowser(id)
             loadBrowsers(forceRefresh = false)
+        }
+    }
+
+    // --- Rules (stage 6) ----------------------------------------------------
+    // Each method computes the new list and fires SetRulesUseCase. Out-of-range
+    // indices are silent no-ops (UI commands race with state in theory; cheaper
+    // to ignore than throw).
+
+    fun onAddRule(pattern: String, browserId: BrowserId) {
+        val current = settings.value.rules
+        scope.launch { setRules(current + UrlRule(pattern, browserId)) }
+    }
+
+    fun onRemoveRule(index: Int) {
+        val current = settings.value.rules
+        if (index !in current.indices) return
+        scope.launch { setRules(current.toMutableList().also { it.removeAt(index) }) }
+    }
+
+    fun onMoveRule(fromIndex: Int, toIndex: Int) {
+        val current = settings.value.rules
+        if (fromIndex !in current.indices || toIndex !in current.indices) return
+        if (fromIndex == toIndex) return
+        val mutable = current.toMutableList()
+        val item = mutable.removeAt(fromIndex)
+        mutable.add(toIndex, item)
+        scope.launch { setRules(mutable) }
+    }
+
+    fun onUpdateRulePattern(index: Int, pattern: String) {
+        val current = settings.value.rules
+        if (index !in current.indices) return
+        if (current[index].pattern == pattern) return
+        scope.launch {
+            setRules(current.mapIndexed { i, r -> if (i == index) r.copy(pattern = pattern) else r })
+        }
+    }
+
+    fun onUpdateRuleBrowser(index: Int, browserId: BrowserId) {
+        val current = settings.value.rules
+        if (index !in current.indices) return
+        if (current[index].browserId == browserId) return
+        scope.launch {
+            setRules(current.mapIndexed { i, r -> if (i == index) r.copy(browserId = browserId) else r })
         }
     }
 

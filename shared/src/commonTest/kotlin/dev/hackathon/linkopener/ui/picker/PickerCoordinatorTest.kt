@@ -4,6 +4,8 @@ import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.core.model.toBrowserId
+import dev.hackathon.linkopener.core.model.UrlRule
+import dev.hackathon.linkopener.domain.RuleEngine
 import dev.hackathon.linkopener.domain.repository.BrowserRepository
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
@@ -179,11 +181,83 @@ class PickerCoordinatorTest {
     }
 
     @Test
+    fun matchingRuleOpensDirectlyAndDoesNotShowPicker() = runTest {
+        val launcher = RecordingLauncher()
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, firefox),
+            settings = AppSettings(
+                rules = listOf(
+                    UrlRule(pattern = "*.example.com", browserId = firefox.toBrowserId()),
+                ),
+            ),
+            launcher = launcher,
+        )
+
+        coord.handleIncomingUrl("https://foo.example.com/page")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(PickerState.Hidden, coord.state.value)
+        assertEquals(listOf(firefox to "https://foo.example.com/page"), launcher.calls)
+    }
+
+    @Test
+    fun ruleMatchingExcludedBrowserFallsThroughToPicker() = runTest {
+        // Decision #4: exclusion wins. Rule points at Firefox but Firefox
+        // is excluded; engine skips and the picker shows the remaining set.
+        val launcher = RecordingLauncher()
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, firefox),
+            settings = AppSettings(
+                excludedBrowserIds = setOf(firefox.toBrowserId()),
+                rules = listOf(
+                    UrlRule(pattern = "*.example.com", browserId = firefox.toBrowserId()),
+                ),
+            ),
+            launcher = launcher,
+        )
+
+        coord.handleIncomingUrl("https://foo.example.com")
+        testScheduler.advanceUntilIdle()
+
+        val state = coord.state.value
+        assertIs<PickerState.Showing>(state)
+        // Picker shows Safari (Firefox is excluded), launcher untouched.
+        assertEquals(listOf(safari), state.browsers)
+        assertEquals(emptyList(), launcher.calls)
+    }
+
+    @Test
+    fun ruleNotMatchingFallsThroughToPicker() = runTest {
+        val launcher = RecordingLauncher()
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, firefox),
+            settings = AppSettings(
+                rules = listOf(
+                    UrlRule(pattern = "*.youtube.com", browserId = firefox.toBrowserId()),
+                ),
+            ),
+            launcher = launcher,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        val state = coord.state.value
+        assertIs<PickerState.Showing>(state)
+        assertEquals(listOf(safari, firefox), state.browsers)
+        assertEquals(emptyList(), launcher.calls)
+    }
+
+    @Test
     fun discoveryFailureFallsBackToEmptyShowingState() = runTest {
         val coord = PickerCoordinator(
             discoverBrowsers = DiscoverBrowsersUseCase(ThrowingBrowserRepository()),
             getSettings = GetSettingsFlowUseCase(InMemorySettingsRepository()),
             launcher = RecordingLauncher(),
+            ruleEngine = RuleEngine(),
             scope = this,
         )
 
@@ -201,10 +275,12 @@ class PickerCoordinatorTest {
         browsers: List<Browser> = emptyList(),
         settings: AppSettings = AppSettings.Default,
         launcher: LinkLauncher = RecordingLauncher(),
+        ruleEngine: RuleEngine = RuleEngine(),
     ): PickerCoordinator = PickerCoordinator(
         discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(browsers)),
         getSettings = GetSettingsFlowUseCase(InMemorySettingsRepository(settings)),
         launcher = launcher,
+        ruleEngine = ruleEngine,
         scope = scope,
     )
 
@@ -252,6 +328,9 @@ class PickerCoordinatorTest {
                     },
                 )
             }
+        }
+        override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) {
+            _settings.update { it.copy(rules = rules) }
         }
     }
 

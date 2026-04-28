@@ -152,6 +152,7 @@ class SettingsViewModelTest {
                     ownBundleId = "test",
                 ),
                 removeManualBrowser = RemoveManualBrowserUseCase(FakeSettingsRepository()),
+                setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
                 getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
@@ -422,6 +423,115 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun onAddRuleAppendsToList() = runTest {
+        val repo = FakeSettingsRepository()
+        val vm = newViewModel(repo = repo, scope = this)
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+
+        vm.onAddRule("*.example.com", firefoxId)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf(dev.hackathon.linkopener.core.model.UrlRule("*.example.com", firefoxId)),
+            repo.settings.value.rules,
+        )
+    }
+
+    @Test
+    fun onRemoveRuleDropsByIndex() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val chromeId = BrowserId("/Apps/Chrome.app")
+        repo.emit(
+            repo.settings.value.copy(
+                rules = listOf(
+                    dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId),
+                    dev.hackathon.linkopener.core.model.UrlRule("b", chromeId),
+                ),
+            ),
+        )
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onRemoveRule(0)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf(dev.hackathon.linkopener.core.model.UrlRule("b", chromeId)),
+            repo.settings.value.rules,
+        )
+    }
+
+    @Test
+    fun onRemoveRuleOutOfRangeIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        repo.emit(
+            repo.settings.value.copy(
+                rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId)),
+            ),
+        )
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onRemoveRule(99)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.settings.value.rules.size)
+    }
+
+    @Test
+    fun onMoveRuleSwapsPositions() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val chromeId = BrowserId("/Apps/Chrome.app")
+        val rules = listOf(
+            dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId),
+            dev.hackathon.linkopener.core.model.UrlRule("b", chromeId),
+        )
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onMoveRule(0, 1)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(rules.reversed(), repo.settings.value.rules)
+    }
+
+    @Test
+    fun onUpdateRulePatternEditsInPlace() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        repo.emit(
+            repo.settings.value.copy(
+                rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("old", firefoxId)),
+            ),
+        )
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onUpdateRulePattern(0, "new")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("new", repo.settings.value.rules[0].pattern)
+    }
+
+    @Test
+    fun onUpdateRuleBrowserEditsInPlace() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val chromeId = BrowserId("/Apps/Chrome.app")
+        repo.emit(
+            repo.settings.value.copy(
+                rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId)),
+            ),
+        )
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onUpdateRuleBrowser(0, chromeId)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(chromeId, repo.settings.value.rules[0].browserId)
+    }
+
+    @Test
     fun onBrowserExclusionToggledRemovesBrowser() = runTest {
         val repo = FakeSettingsRepository()
         val vm = newViewModel(repo = repo, scope = this)
@@ -457,6 +567,7 @@ class SettingsViewModelTest {
             ownBundleId = "dev.hackathon.linkopener",
         ),
         removeManualBrowser = RemoveManualBrowserUseCase(repo),
+        setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(repo),
         discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
         observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(defaultBrowserService),
         getIsDefaultBrowser = GetIsDefaultBrowserUseCase(defaultBrowserService),
@@ -525,6 +636,10 @@ class SettingsViewModelTest {
                     },
                 )
             }
+        }
+
+        override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) {
+            _settings.update { it.copy(rules = rules) }
         }
     }
 

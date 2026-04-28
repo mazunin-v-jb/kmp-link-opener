@@ -5,6 +5,7 @@ import dev.hackathon.linkopener.data.AppInfoRepositoryImpl
 import dev.hackathon.linkopener.data.BrowserRepositoryImpl
 import dev.hackathon.linkopener.data.SettingsRepositoryImpl
 import dev.hackathon.linkopener.domain.BrowserMetadataExtractor
+import dev.hackathon.linkopener.domain.RuleEngine
 import dev.hackathon.linkopener.domain.repository.AppInfoRepository
 import dev.hackathon.linkopener.domain.repository.BrowserRepository
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
@@ -20,6 +21,7 @@ import dev.hackathon.linkopener.domain.usecase.RemoveManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
+import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.AutoStartManager
@@ -93,6 +95,12 @@ class AppContainer {
     )
     val removeManualBrowserUseCase: RemoveManualBrowserUseCase =
         RemoveManualBrowserUseCase(settingsRepository)
+    val setRulesUseCase: SetRulesUseCase = SetRulesUseCase(settingsRepository)
+
+    private val ruleEngine: RuleEngine = RuleEngine(
+        debug = DEBUG_LOGGING,
+        log = ::println,
+    )
 
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
         DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
@@ -109,6 +117,7 @@ class AppContainer {
         discoverBrowsers = discoverBrowsersUseCase,
         getSettings = getSettingsFlowUseCase,
         launcher = linkLauncher,
+        ruleEngine = ruleEngine,
         scope = coroutineScope,
     )
 
@@ -168,6 +177,7 @@ class AppContainer {
         setBrowserOrder = setBrowserOrderUseCase,
         addManualBrowser = addManualBrowserUseCase,
         removeManualBrowser = removeManualBrowserUseCase,
+        setRules = setRulesUseCase,
         discoverBrowsers = discoverBrowsersUseCase,
         observeIsDefaultBrowser = observeIsDefaultBrowserUseCase,
         getIsDefaultBrowser = getIsDefaultBrowserUseCase,

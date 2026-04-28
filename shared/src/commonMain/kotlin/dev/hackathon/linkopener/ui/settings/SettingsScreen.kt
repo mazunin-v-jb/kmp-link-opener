@@ -60,6 +60,7 @@ import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.UrlRule
 import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.icons.AppIcons
@@ -74,6 +75,12 @@ import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLowest
 import dev.hackathon.linkopener.ui.theme.LocalIsDarkMode
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.add_browser
+import kmp_link_opener.shared.generated.resources.add_rule
+import kmp_link_opener.shared.generated.resources.rule_no_browsers
+import kmp_link_opener.shared.generated.resources.rule_no_rules
+import kmp_link_opener.shared.generated.resources.rule_pattern_placeholder
+import kmp_link_opener.shared.generated.resources.rule_remove_content_description
+import kmp_link_opener.shared.generated.resources.section_rules
 import kmp_link_opener.shared.generated.resources.app_language
 import kmp_link_opener.shared.generated.resources.app_name
 import kmp_link_opener.shared.generated.resources.banner_not_default_body
@@ -114,7 +121,7 @@ import kmp_link_opener.shared.generated.resources.theme_mode
 import kmp_link_opener.shared.generated.resources.version_prefix
 import org.jetbrains.compose.resources.stringResource
 
-private enum class NavSection { DefaultBrowser, Appearance, Language, System, Exclusions }
+private enum class NavSection { DefaultBrowser, Appearance, Language, System, Exclusions, Rules }
 
 @Composable
 fun SettingsScreen(
@@ -209,6 +216,15 @@ fun SettingsScreen(
                             onAddBrowserClick = onAddBrowserClick,
                             onDismissManualAddNotice = viewModel::dismissManualAddNotice,
                             onRetry = viewModel::refreshBrowsers,
+                        )
+                        NavSection.Rules -> RulesSection(
+                            rules = settings.rules,
+                            availableBrowsers = (browsers as? BrowsersState.Loaded)?.browsers ?: emptyList(),
+                            onAddRule = viewModel::onAddRule,
+                            onRemoveRule = viewModel::onRemoveRule,
+                            onMoveRule = viewModel::onMoveRule,
+                            onUpdateRulePattern = viewModel::onUpdateRulePattern,
+                            onUpdateRuleBrowser = viewModel::onUpdateRuleBrowser,
                         )
                     }
                 }
@@ -411,6 +427,9 @@ private fun Sidebar(
             NavItem(AppIcons.Settings, stringResource(Res.string.section_browser_exclusions),
                 active = activeSection == NavSection.Exclusions,
                 onClick = { onSelect(NavSection.Exclusions) })
+            NavItem(AppIcons.SettingsSuggest, stringResource(Res.string.section_rules),
+                active = activeSection == NavSection.Rules,
+                onClick = { onSelect(NavSection.Rules) })
         }
     }
 }
@@ -1039,6 +1058,232 @@ private fun BrowserRow(
         )
     }
 }
+
+// region Rules section (stage 6)
+
+@Composable
+private fun RulesSection(
+    rules: List<UrlRule>,
+    availableBrowsers: List<Browser>,
+    onAddRule: (pattern: String, browserId: BrowserId) -> Unit,
+    onRemoveRule: (index: Int) -> Unit,
+    onMoveRule: (fromIndex: Int, toIndex: Int) -> Unit,
+    onUpdateRulePattern: (index: Int, pattern: String) -> Unit,
+    onUpdateRuleBrowser: (index: Int, browserId: BrowserId) -> Unit,
+) {
+    SectionPane(stringResource(Res.string.section_rules), AppIcons.SettingsSuggest) {
+        if (availableBrowsers.isEmpty()) {
+            SectionCard {
+                Text(
+                    text = stringResource(Res.string.rule_no_browsers),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            return@SectionPane
+        }
+        if (rules.isEmpty()) {
+            SectionCard {
+                Text(
+                    text = stringResource(Res.string.rule_no_rules),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = surfaceContainerLowest(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rules.forEachIndexed { index, rule ->
+                    RuleRow(
+                        rule = rule,
+                        availableBrowsers = availableBrowsers,
+                        canMoveUp = index > 0,
+                        canMoveDown = index < rules.lastIndex,
+                        onPatternChange = { onUpdateRulePattern(index, it) },
+                        onBrowserChange = { onUpdateRuleBrowser(index, it) },
+                        onMoveUp = { onMoveRule(index, index - 1) },
+                        onMoveDown = { onMoveRule(index, index + 1) },
+                        onRemove = { onRemoveRule(index) },
+                    )
+                }
+            }
+        }
+        OutlinedButton(
+            onClick = {
+                // Default to the first available browser; user can pick another in the dropdown.
+                val firstBrowser = availableBrowsers.first().toBrowserId()
+                onAddRule("", firstBrowser)
+            },
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = stringResource(Res.string.add_rule),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RuleRow(
+    rule: UrlRule,
+    availableBrowsers: List<Browser>,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onPatternChange: (String) -> Unit,
+    onBrowserChange: (BrowserId) -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Pattern field
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .background(
+                    color = surfaceContainerLow(),
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            BasicTextField(
+                value = rule.pattern,
+                onValueChange = onPatternChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 13.sp,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (rule.pattern.isEmpty()) {
+                Text(
+                    text = stringResource(Res.string.rule_pattern_placeholder),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 13.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "→",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(8.dp))
+        // Browser dropdown
+        BrowserDropdown(
+            current = rule.browserId,
+            options = availableBrowsers,
+            onSelected = onBrowserChange,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(4.dp))
+        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+            Icon(
+                imageVector = AppIcons.ArrowUp,
+                contentDescription = stringResource(Res.string.move_up),
+                tint = if (canMoveUp) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                },
+            )
+        }
+        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+            Icon(
+                imageVector = AppIcons.ArrowDown,
+                contentDescription = stringResource(Res.string.move_down),
+                tint = if (canMoveDown) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                },
+            )
+        }
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = AppIcons.Close,
+                contentDescription = stringResource(Res.string.rule_remove_content_description),
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BrowserDropdown(
+    current: BrowserId,
+    options: List<Browser>,
+    onSelected: (BrowserId) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentBrowser = options.firstOrNull { it.toBrowserId() == current }
+    val label = currentBrowser?.displayName ?: current.value.substringAfterLast('/')
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                color = LocalContentColor.current,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                imageVector = AppIcons.ChevronDown,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { browser ->
+                DropdownMenuItem(
+                    text = { Text(browser.displayName) },
+                    onClick = {
+                        onSelected(browser.toBrowserId())
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+// endregion
 
 @Composable
 private fun BrowserIconBox(initial: String) {

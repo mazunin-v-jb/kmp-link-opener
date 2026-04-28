@@ -2,6 +2,8 @@ package dev.hackathon.linkopener.ui.picker
 
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.toBrowserId
+import dev.hackathon.linkopener.domain.RuleDecision
+import dev.hackathon.linkopener.domain.RuleEngine
 import dev.hackathon.linkopener.domain.applyUserOrder
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
@@ -17,6 +19,7 @@ class PickerCoordinator(
     private val discoverBrowsers: DiscoverBrowsersUseCase,
     private val getSettings: GetSettingsFlowUseCase,
     private val launcher: LinkLauncher,
+    private val ruleEngine: RuleEngine,
     private val scope: CoroutineScope,
 ) {
     private val _state = MutableStateFlow<PickerState>(PickerState.Hidden)
@@ -27,6 +30,20 @@ class PickerCoordinator(
             try {
                 val all = discoverBrowsers()
                 val settings = getSettings().value
+                // Rule engine sees the full discovered list and the
+                // exclusions set; it owns decisions #4 (exclusion wins) and
+                // #5 (skip if browser missing), so this call site doesn't
+                // pre-filter — it just respects the engine's verdict.
+                val decision = ruleEngine.resolve(
+                    url = url,
+                    rules = settings.rules,
+                    browsers = all,
+                    exclusions = settings.excludedBrowserIds,
+                )
+                if (decision is RuleDecision.Direct) {
+                    launcher.openIn(decision.browser, url)
+                    return@launch
+                }
                 val available = all.filterNot { it.toBrowserId() in settings.excludedBrowserIds }
                 val ordered = applyUserOrder(available, settings.browserOrder)
                 _state.value = PickerState.Showing(url = url, browsers = ordered)

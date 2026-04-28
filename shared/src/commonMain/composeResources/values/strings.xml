@@ -42,6 +42,12 @@
     <string name="manual_add_self">Can't add Link Opener as a browser.</string>
     <string name="manual_add_invalid_prefix">Couldn't add this app: </string>
     <string name="manual_add_dismiss">Dismiss</string>
+    <string name="section_rules">Rules</string>
+    <string name="add_rule">+ Add rule…</string>
+    <string name="rule_pattern_placeholder">Pattern (e.g. *.youtube.com)</string>
+    <string name="rule_no_browsers">No browsers available — discover or add some first.</string>
+    <string name="rule_no_rules">No rules yet. Click "+ Add rule…" to make every link to a domain open in a specific browser.</string>
+    <string name="rule_remove_content_description">Remove rule</string>
     <string name="system_default">System Default</string>
     <string name="empty_browsers_message">No installed browsers detected yet.</string>
 

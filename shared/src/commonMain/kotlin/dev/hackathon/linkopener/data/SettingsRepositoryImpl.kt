@@ -6,6 +6,7 @@ import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.UrlRule
 import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.platform.AutoStartManager
@@ -73,6 +74,12 @@ class SettingsRepositoryImpl(
         _settings.update { it.copy(manualBrowsers = updated) }
     }
 
+    override suspend fun setRules(rules: List<UrlRule>) {
+        if (rules == _settings.value.rules) return
+        store.putString(KEY_RULES, encodeRules(rules))
+        _settings.update { it.copy(rules = rules) }
+    }
+
     private fun load(): AppSettings = AppSettings(
         theme = readEnum(KEY_THEME, AppTheme.entries, AppTheme.System),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
@@ -80,6 +87,7 @@ class SettingsRepositoryImpl(
         excludedBrowserIds = decodeIds(store.getStringOrNull(KEY_EXCLUSIONS)),
         browserOrder = decodeOrder(store.getStringOrNull(KEY_BROWSER_ORDER)),
         manualBrowsers = decodeManual(store.getStringOrNull(KEY_MANUAL_BROWSERS)),
+        rules = decodeRules(store.getStringOrNull(KEY_RULES)),
     )
 
     private fun <E : Enum<E>> readEnum(key: String, values: List<E>, default: E): E {
@@ -120,6 +128,16 @@ class SettingsRepositoryImpl(
         }.getOrDefault(emptyList())
     }
 
+    private fun encodeRules(rules: List<UrlRule>): String =
+        json.encodeToString(ListSerializer(UrlRule.serializer()), rules)
+
+    private fun decodeRules(raw: String?): List<UrlRule> {
+        if (raw.isNullOrEmpty()) return emptyList()
+        return runCatching {
+            json.decodeFromString(ListSerializer(UrlRule.serializer()), raw)
+        }.getOrDefault(emptyList())
+    }
+
     private companion object {
         const val KEY_THEME = "settings.theme"
         const val KEY_LANGUAGE = "settings.language"
@@ -127,5 +145,6 @@ class SettingsRepositoryImpl(
         const val KEY_EXCLUSIONS = "settings.exclusions"
         const val KEY_BROWSER_ORDER = "settings.browserOrder"
         const val KEY_MANUAL_BROWSERS = "settings.manualBrowsers"
+        const val KEY_RULES = "settings.rules"
     }
 }

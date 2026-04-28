@@ -20,8 +20,9 @@ Status as of latest main:
 | 4.3 | Manual browser addition (file picker → `Info.plist` → settings.manualBrowsers, merged into discovered list and picker) | ✅ |
 | 4.5 | Design system (colors, typography, icons, theme) | ✅ |
 | 5 | i18n via Compose Resources XML + JVM-locale override | ✅ |
+| 6 | Custom URL → browser rules (host-glob, first-match-wins, integrated into picker flow) | ✅ |
 
-**Stages still open:** 6 (custom URL→browser rules), 7 (Windows registry / default-app registration), 8 (Linux `.desktop` + `xdg-mime`).
+**Stages still open:** 7 (Windows registry / default-app registration), 8 (Linux `.desktop` + `xdg-mime`).
 
 Recent additions worth knowing about for context:
 

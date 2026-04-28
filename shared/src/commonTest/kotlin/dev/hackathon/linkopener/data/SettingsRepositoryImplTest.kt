@@ -240,6 +240,74 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
+    fun setRulesPersistsList() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+        val rules = listOf(
+            dev.hackathon.linkopener.core.model.UrlRule(
+                pattern = "*.youtube.com",
+                browserId = BrowserId("/Applications/Firefox.app"),
+            ),
+        )
+
+        repo.setRules(rules)
+
+        assertEquals(rules, repo.settings.value.rules)
+        assertTrue(store.getStringOrNull("settings.rules")!!.contains("youtube.com"))
+    }
+
+    @Test
+    fun setRulesIsIdempotent() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+        val rules = listOf(
+            dev.hackathon.linkopener.core.model.UrlRule(
+                pattern = "*.example.com",
+                browserId = BrowserId("/Applications/Chrome.app"),
+            ),
+        )
+
+        repo.setRules(rules)
+        repo.setRules(rules)
+
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    @Test
+    fun loadsRulesFromStore() = runTest {
+        val store = FakeSettings()
+        // BrowserId is a @Serializable @JvmInline value class — kotlinx
+        // unwraps it to a bare string in JSON, so `browserId` is a string
+        // rather than `{ "value": "..." }`.
+        store.putString(
+            "settings.rules",
+            """[{"pattern":"*.example.com","browserId":"/Apps/Chrome.app"}]""",
+        )
+
+        val repo = newRepo(store = store)
+
+        assertEquals(
+            listOf(
+                dev.hackathon.linkopener.core.model.UrlRule(
+                    pattern = "*.example.com",
+                    browserId = BrowserId("/Apps/Chrome.app"),
+                ),
+            ),
+            repo.settings.value.rules,
+        )
+    }
+
+    @Test
+    fun corruptedRulesJsonFallsBackToEmpty() = runTest {
+        val store = FakeSettings()
+        store.putString("settings.rules", "not-json")
+
+        val repo = newRepo(store = store)
+
+        assertEquals(emptyList(), repo.settings.value.rules)
+    }
+
+    @Test
     fun corruptedExclusionsJsonFallsBackToEmpty() = runTest {
         val store = FakeSettings()
         store.putString("settings.exclusions", "not-a-json")

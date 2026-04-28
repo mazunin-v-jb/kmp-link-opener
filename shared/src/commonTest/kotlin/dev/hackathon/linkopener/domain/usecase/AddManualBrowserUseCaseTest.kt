@@ -145,5 +145,8 @@ class AddManualBrowserUseCaseTest {
                 )
             }
         }
+        override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) {
+            _settings.update { it.copy(rules = rules) }
+        }
     }
 }

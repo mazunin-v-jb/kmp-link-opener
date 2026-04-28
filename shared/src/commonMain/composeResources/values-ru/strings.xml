@@ -34,6 +34,12 @@
     <string name="manual_add_self">Нельзя добавить Link Opener сам в себя.</string>
     <string name="manual_add_invalid_prefix">Не удалось добавить это приложение: </string>
     <string name="manual_add_dismiss">Скрыть</string>
+    <string name="section_rules">Правила</string>
+    <string name="add_rule">+ Добавить правило…</string>
+    <string name="rule_pattern_placeholder">Паттерн (например, *.youtube.com)</string>
+    <string name="rule_no_browsers">Нет доступных браузеров — сначала найди или добавь хотя бы один.</string>
+    <string name="rule_no_rules">Правил пока нет. Нажми «+ Добавить правило…», чтобы все ссылки на домен открывались в конкретном браузере.</string>
+    <string name="rule_remove_content_description">Удалить правило</string>
     <string name="system_default">По умолчанию в системе</string>
     <string name="empty_browsers_message">Установленные браузеры пока не найдены.</string>
 

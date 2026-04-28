@@ -5,6 +5,7 @@ import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.UrlRule
 import kotlinx.coroutines.flow.StateFlow
 
 interface SettingsRepository {
@@ -17,4 +18,5 @@ interface SettingsRepository {
     suspend fun setBrowserOrder(order: List<BrowserId>)
     suspend fun addManualBrowser(browser: Browser)
     suspend fun removeManualBrowser(id: BrowserId)
+    suspend fun setRules(rules: List<UrlRule>)
 }

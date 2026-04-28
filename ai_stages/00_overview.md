@@ -16,8 +16,9 @@
 > | 4.3 | Ручное добавление браузеров через native file picker | ✅ |
 > | 4.5 | Дизайн-система (M3 colors / typography / brand-icon) | ✅ |
 > | 5 | i18n через Compose Resources XML + locale-flip на click thread | ✅ |
+> | 6 | Custom URL → browser rules (host-glob, first-match-wins, picker integration) | ✅ |
 >
-> **В работе/будущее:** стадия 6 (custom rules), 7 (Windows), 8 (Linux).
+> **В работе/будущее:** стадия 7 (Windows), 8 (Linux).
 >
 > Тех-долг — в [`../TECHDEBT.md`](../TECHDEBT.md). Расхождения между планами и финальной реализацией задокументированы в секциях «Implementation notes» внутри каждого `ai_stages/<NN>_*/plan.md`.
 >

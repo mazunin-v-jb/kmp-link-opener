@@ -62,5 +62,6 @@ class SetBrowserExcludedUseCaseTest {
         override suspend fun setBrowserOrder(order: List<BrowserId>) = error("not used")
         override suspend fun addManualBrowser(browser: dev.hackathon.linkopener.core.model.Browser) = error("not used")
         override suspend fun removeManualBrowser(id: BrowserId) = error("not used")
+        override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) = error("not used")
     }
 }
