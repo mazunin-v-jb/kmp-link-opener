@@ -31,6 +31,11 @@ class SettingsViewModel(
     private val openDefaultBrowserSettings: OpenDefaultBrowserSettingsUseCase,
     getCanOpenSystemSettings: GetCanOpenSystemSettingsUseCase,
     private val scope: CoroutineScope,
+    // Synchronously flips JVM Locale.getDefault on user language change so any
+    // Compose recomposition (in any composition — main or Window
+    // subcomposition) reads the new locale on its next pass. Defaults to
+    // no-op so commonTest VMs don't need to know about JVM specifics.
+    private val applyLocale: (AppLanguage) -> Unit = {},
 ) {
     val settings: StateFlow<AppSettings> = getSettings()
 
@@ -58,6 +63,13 @@ class SettingsViewModel(
     }
 
     fun onLanguageSelected(language: AppLanguage) {
+        // Apply BEFORE launching the suspend so the JVM default flips on the
+        // click thread, before the StateFlow emit fans out to any Compose
+        // collector. Otherwise the main composition (TrayHost) and the Window
+        // subcomposition (SettingsScreen) race — and on the *first* change
+        // the subcomposition wins, leaving the smart-skipped header / sidebar
+        // / banner translated to the previous locale.
+        applyLocale(language)
         scope.launch { updateLanguage(language) }
     }
 

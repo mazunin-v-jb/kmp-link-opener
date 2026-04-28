@@ -1,7 +1,6 @@
 package dev.hackathon.linkopener.app.tray
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,12 +13,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
-import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
 import java.awt.MouseInfo
-import java.util.Locale
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.app_name
 import kmp_link_opener.shared.generated.resources.tray_menu_quit
@@ -37,37 +34,12 @@ fun ApplicationScope.TrayHost(
     val settingsViewModel = remember(container) { container.newSettingsViewModel() }
     val settings by settingsViewModel.settings.collectAsState()
 
-    // Compose Resources resolves the active locale from
-    // androidx.compose.ui.text.intl.Locale.current → java.util.Locale.getDefault()
-    // on JVM. We override the JVM default whenever the user's selected
-    // language changes — but synchronously during the composition body
-    // (rather than via DisposableEffect+key) so the change propagates on
-    // the SAME recomposition pass. With key() the entire subtree was being
-    // disposed and recreated, which closed any open Window children. Side
-    // effect is JVM-wide (DateFormat / NumberFormat etc.) — acceptable for
-    // this app since we don't display dates / formatted numbers.
-    val systemTag = remember { Locale.getDefault().language }
-    val resolvedLocaleTag = remember(settings.language, systemTag) {
-        when (settings.language) {
-            AppLanguage.En -> "en"
-            AppLanguage.Ru -> "ru"
-            AppLanguage.System -> if (systemTag == "ru") "ru" else "en"
-        }
-    }
-    val targetLocale = remember(resolvedLocaleTag) { Locale.forLanguageTag(resolvedLocaleTag) }
-    if (Locale.getDefault() != targetLocale) {
-        // Idempotent set — Compose may re-run this body multiple times per
-        // recomposition cycle and the equality guard avoids redundant calls.
-        Locale.setDefault(targetLocale)
-    }
-    val originalLocale = remember { Locale.getDefault() }
-    DisposableEffect(Unit) {
-        onDispose {
-            // Restore on full TrayHost teardown so we don't leak the override
-            // into the JVM after shutdown.
-            Locale.setDefault(originalLocale)
-        }
-    }
+    // JVM Locale.setDefault is now applied upstream — at AppContainer init
+    // for the loaded language and inside SettingsViewModel.onLanguageSelected
+    // (synchronously, on the click thread) for user changes. By the time
+    // any composition runs, Compose Resources sees the right locale on its
+    // own pass — no in-composition side effects, no race between the main
+    // composition and the Window subcomposition.
 
     TrayHostBody(
         container = container,
