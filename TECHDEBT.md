@@ -34,29 +34,9 @@ Resolved items are removed (git log preserves history) — keep the list short s
 
 ---
 
-## TD-5 — Windows default-browser detection is a stub
-
-**Where:** `shared/src/jvmMain/kotlin/dev/hackathon/linkopener/platform/windows/WindowsDefaultBrowserService.kt`.
-
-**What:** `isDefaultBrowser()` always returns `false`. There is no real check against the registry (`HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice` etc.). This is fine until stage 7 lands, but flagged so it doesn't get forgotten when Windows support is real.
-
-**Action:** part of stage 7 anyway — leave the TODO in `WindowsDefaultBrowserService.kt` and treat this entry as a backlog cross-reference.
-
----
-
-## TD-6 — Inter font is not bundled
-
-**Where:** `shared/src/commonMain/kotlin/dev/hackathon/linkopener/ui/theme/LinkOpenerTypography.kt` (TODO comment), context in `ai_stages/045_design_system/plan.md`.
-
-**What:** Stage 4.5 design spec calls for Inter as the app font. We ship `FontFamily.Default` for now to avoid pulling in font binaries before we knew if the design would stick.
-
-**Action:** drop Inter `.ttf` files into `shared/src/commonMain/composeResources/font/`, wire `Font(...)` in `LinkOpenerTypography.kt`, replace `FontFamily.Default` with the resulting `FontFamily(Font(...))`. Sub-1-hour change once the licensing is confirmed (Inter is OFL — license file lives next to the .ttf).
-
----
-
 ## TD-7 — Dev-only "Test picker" tray entry must be removed before release
 
-**Where:** `desktopApp/src/jvmMain/kotlin/dev/hackathon/linkopener/app/tray/TrayHost.kt:81` (TODO comment).
+**Where:** `desktopApp/src/jvmMain/kotlin/dev/hackathon/linkopener/app/tray/TrayHost.kt:78` (TODO comment).
 
 **What:** A "Test picker (dev)" item in the tray menu spawns the picker with `https://example.com/?utm=picker-test` so we can exercise the picker chain without packaging the app and registering it as the default browser. It's there because debugging the picker via the actual default-browser flow requires `createDistributable` + reinstall + Launch Services round-trip per change.
 

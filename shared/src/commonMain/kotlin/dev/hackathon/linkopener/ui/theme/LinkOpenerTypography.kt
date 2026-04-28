@@ -6,11 +6,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Type scale lifted from the design system (DESIGN.md → typography:).
-// FontFamily stays at FontFamily.Default for now — bundling Inter requires
-// dropping the .ttf into resources and wiring Font(...) loading. TODO: when
-// Inter font files are added under desktopApp/src/jvmMain/resources/fonts,
-// switch to a custom FontFamily here.
+// Type scale lifted from the design system (DESIGN.md → typography:). We use
+// the platform default font family rather than bundling a custom one.
 private val DefaultFamily = FontFamily.Default
 
 val LinkOpenerTypography: Typography = Typography(
