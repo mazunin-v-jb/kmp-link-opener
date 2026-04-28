@@ -53,6 +53,12 @@ fun ApplicationScope.PickerWindow(
             }
         },
     ) {
+        // Lift the NSWindow above fullscreen apps' overlay. AWT alone keeps us
+        // at NSFloatingWindowLevel which sits below them.
+        LaunchedEffect(Unit) {
+            MacOsAlwaysOnTopOverFullScreen.apply(window)
+        }
+
         // Auto-dismiss on focus loss. Skip the very first emission because
         // the window may briefly start unfocused before the OS hands it focus.
         val windowInfo = LocalWindowInfo.current

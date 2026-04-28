@@ -20,6 +20,10 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatformSettings)
+            // Used to call libobjc on macOS to set NSWindow level/collectionBehavior
+            // so the picker overlays fullscreen apps. Harmless on Win/Linux —
+            // the helper is no-op there.
+            implementation(libs.jna)
         }
 
         jvmTest.dependencies {
@@ -36,6 +40,14 @@ val notarizationProfile: String? = findProperty("macos.notarization.profile") as
 compose.desktop {
     application {
         mainClass = "dev.hackathon.linkopener.app.MainKt"
+        // Required by MacOsAlwaysOnTopOverFullScreen — reflects into the AWT
+        // peer chain to grab the underlying NSWindow pointer. Harmless
+        // warnings on non-mac OSes (sun.lwawt.macosx package missing).
+        jvmArgs += listOf(
+            "--add-opens", "java.desktop/sun.awt=ALL-UNNAMED",
+            "--add-opens", "java.desktop/sun.lwawt=ALL-UNNAMED",
+            "--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+        )
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = composePackageName
