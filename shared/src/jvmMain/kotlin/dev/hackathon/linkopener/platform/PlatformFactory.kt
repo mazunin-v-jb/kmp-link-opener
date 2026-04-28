@@ -33,6 +33,13 @@ object PlatformFactory {
         HostOs.Other -> LinuxDefaultBrowserService()
     }
 
+    // TODO: stage 3b — once MacOsLinkLauncher / WindowsLinkLauncher /
+    //  LinuxLinkLauncher are written by the colleague (per
+    //  ai_stages/042_browser_picker_popup/CONTRACT_for_link_launcher.md),
+    //  switch to a when-block on currentOs. PrintingLinkLauncher stays as
+    //  the HostOs.Other fallback.
+    fun createLinkLauncher(): LinkLauncher = PrintingLinkLauncher()
+
     private fun detectHostOs(): HostOs =
         detectHostOs(System.getProperty("os.name").orEmpty())
 

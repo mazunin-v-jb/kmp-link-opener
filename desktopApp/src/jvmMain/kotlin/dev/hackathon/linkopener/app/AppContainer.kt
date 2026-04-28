@@ -21,8 +21,10 @@ import dev.hackathon.linkopener.platform.AutoStartManager
 import dev.hackathon.linkopener.platform.BrowserDiscovery
 import dev.hackathon.linkopener.platform.DefaultBrowserService
 import dev.hackathon.linkopener.platform.HostOs
+import dev.hackathon.linkopener.platform.LinkLauncher
 import dev.hackathon.linkopener.platform.PlatformFactory
 import dev.hackathon.linkopener.platform.UrlReceiver
+import dev.hackathon.linkopener.ui.picker.PickerCoordinator
 import dev.hackathon.linkopener.ui.settings.SettingsViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +48,7 @@ class AppContainer {
     val urlReceiver: UrlReceiver = PlatformFactory.createUrlReceiver()
     private val defaultBrowserService: DefaultBrowserService =
         PlatformFactory.createDefaultBrowserService()
+    private val linkLauncher: LinkLauncher = PlatformFactory.createLinkLauncher()
 
     private val appInfoRepository: AppInfoRepository = AppInfoRepositoryImpl()
     private val browserRepository: BrowserRepository = BrowserRepositoryImpl(browserDiscovery)
@@ -77,6 +80,13 @@ class AppContainer {
         OpenDefaultBrowserSettingsUseCase(defaultBrowserService)
     val getCanOpenSystemSettingsUseCase: GetCanOpenSystemSettingsUseCase =
         GetCanOpenSystemSettingsUseCase(defaultBrowserService)
+
+    val pickerCoordinator: PickerCoordinator = PickerCoordinator(
+        discoverBrowsers = discoverBrowsersUseCase,
+        getSettings = getSettingsFlowUseCase,
+        launcher = linkLauncher,
+        scope = coroutineScope,
+    )
 
     init {
         coroutineScope.launch {

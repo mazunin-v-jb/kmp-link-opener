@@ -32,6 +32,7 @@ data class Strings(
     val configure: String,
     val trayMenuSettings: String,
     val trayMenuQuit: String,
+    val trayMenuTestPicker: String,
     val trayWindowSettingsSuffix: String,
     // Default-browser banner + section
     val bannerNotDefaultTitle: String,
@@ -51,6 +52,11 @@ data class Strings(
     val browsersEmpty: String,
     val browsersErrorPrefix: String,
     val retry: String,
+    // Picker popup
+    val pickerHeaderOpen: String,
+    val pickerShowAll: String,
+    val pickerEmpty: String,
+    val pickerEmptyHint: String,
 ) {
     fun label(theme: AppTheme): String = when (theme) {
         AppTheme.System -> themeSystem
@@ -103,6 +109,7 @@ val EnglishStrings: Strings = Strings(
     configure = "Configure",
     trayMenuSettings = "Settings",
     trayMenuQuit = "Quit",
+    trayMenuTestPicker = "Test picker (dev)",
     trayWindowSettingsSuffix = " — Settings",
     bannerNotDefaultTitle = "Link Opener isn't your default browser",
     bannerNotDefaultBody = "Set Link Opener as the default to intercept links opened from any app.",
@@ -132,6 +139,10 @@ val EnglishStrings: Strings = Strings(
     browsersEmpty = "No browsers detected on this system.",
     browsersErrorPrefix = "Browser discovery failed: ",
     retry = "Retry",
+    pickerHeaderOpen = "Open in:",
+    pickerShowAll = "Show all",
+    pickerEmpty = "No browsers available",
+    pickerEmptyHint = "Open Settings to manage exclusions or install a browser.",
 )
 
 val RussianStrings: Strings = Strings(
@@ -162,6 +173,7 @@ val RussianStrings: Strings = Strings(
     configure = "Настроить",
     trayMenuSettings = "Настройки",
     trayMenuQuit = "Выход",
+    trayMenuTestPicker = "Тест picker'а (dev)",
     trayWindowSettingsSuffix = " — Настройки",
     bannerNotDefaultTitle = "Link Opener не выбран браузером по умолчанию",
     bannerNotDefaultBody = "Назначьте Link Opener браузером по умолчанию, чтобы перехватывать ссылки из любых приложений.",
@@ -191,6 +203,10 @@ val RussianStrings: Strings = Strings(
     browsersEmpty = "Браузеры в системе не найдены.",
     browsersErrorPrefix = "Ошибка обнаружения браузеров: ",
     retry = "Повторить",
+    pickerHeaderOpen = "Открыть в:",
+    pickerShowAll = "Показать все",
+    pickerEmpty = "Браузеры недоступны",
+    pickerEmptyHint = "Откройте настройки, чтобы убрать исключения или установить браузер.",
 )
 
 fun resolveStrings(language: AppLanguage, systemLanguageTag: String?): Strings = when (language) {
