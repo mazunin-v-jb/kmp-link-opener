@@ -50,11 +50,15 @@ kover {
                     "dev.hackathon.linkopener.ui.theme.LinkOpenerTypography*",
                     "dev.hackathon.linkopener.ui.tray.**",
                 )
-                // Process-spawning / framework-glue layers we'd only smoke-test on macOS.
+                // Process-spawning / framework-glue layers we'd only smoke-test on the
+                // matching OS. The default-browser services on macOS / Windows shell out
+                // via ProcessBuilder; the linux impl is a no-op stub and IS unit-tested.
                 classes(
                     "dev.hackathon.linkopener.platform.JvmUrlReceiver*",
                     "dev.hackathon.linkopener.platform.macos.PlutilRunner*",
                     "dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager*",
+                    "dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService*",
+                    "dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService*",
                 )
             }
         }

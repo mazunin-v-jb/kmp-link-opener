@@ -2,8 +2,10 @@ package dev.hackathon.linkopener.ui.strings
 
 import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppTheme
+import dev.hackathon.linkopener.platform.HostOs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class StringsLabelTest {
 
@@ -49,5 +51,33 @@ class StringsLabelTest {
             val label = RussianStrings.label(lang)
             assertEquals(true, label.isNotBlank(), "RussianStrings.label($lang) was blank")
         }
+    }
+
+    @Test
+    fun defaultBrowserInstructionsCoverEveryHost() {
+        HostOs.entries.forEach { host ->
+            val englishSteps = EnglishStrings.defaultBrowserInstructions(host)
+            val russianSteps = RussianStrings.defaultBrowserInstructions(host)
+
+            assertTrue(englishSteps.isNotEmpty(), "EnglishStrings.defaultBrowserInstructions($host) was empty")
+            assertTrue(russianSteps.isNotEmpty(), "RussianStrings.defaultBrowserInstructions($host) was empty")
+            assertTrue(
+                englishSteps.all { it.isNotBlank() },
+                "EnglishStrings.defaultBrowserInstructions($host) had a blank step",
+            )
+            assertTrue(
+                russianSteps.all { it.isNotBlank() },
+                "RussianStrings.defaultBrowserInstructions($host) had a blank step",
+            )
+        }
+    }
+
+    @Test
+    fun otherHostFallsBackToUnsupportedMessage() {
+        // The "Other" branch is a single-line fallback used when we can't
+        // identify the host OS — must always render *something* sensible
+        // instead of an empty list.
+        assertEquals(1, EnglishStrings.defaultBrowserInstructions(HostOs.Other).size)
+        assertEquals(1, RussianStrings.defaultBrowserInstructions(HostOs.Other).size)
     }
 }
