@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Tray
@@ -19,6 +20,8 @@ import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
 import java.awt.MouseInfo
 import java.util.Locale
 
+private const val APP_ICON_PATH = "icons/app_icon.png"
+
 @Composable
 fun ApplicationScope.TrayHost(
     container: AppContainer,
@@ -28,21 +31,19 @@ fun ApplicationScope.TrayHost(
     val settingsViewModel = remember(container) { container.newSettingsViewModel() }
     val settings by settingsViewModel.settings.collectAsState()
 
-    // Captured once at startup. Locale.getDefault() reads the JVM's locale
-    // which on macOS reflects the system "Region & Language" preference at
-    // the time the app launched. Changing OS locale will require restart —
-    // acceptable for the prototype.
     val systemLanguageTag = remember { Locale.getDefault().language }
 
     val strings = remember(settings.language, systemLanguageTag) {
         resolveStrings(settings.language, systemLanguageTag)
     }
 
+    val appIconPainter = painterResource(APP_ICON_PATH)
+
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
     Tray(
-        icon = remember { PlaceholderTrayIcon() },
-        tooltip = appInfo.name,
+        icon = appIconPainter,
+        tooltip = strings.appName,
         menu = {
             Item(strings.trayMenuSettings, onClick = { settingsAnchor = currentCursorPosition() })
             Item(strings.trayMenuQuit, onClick = onExit)
@@ -53,17 +54,24 @@ fun ApplicationScope.TrayHost(
     if (anchor != null) {
         val windowState = rememberWindowState(
             position = anchor,
-            width = 720.dp,
-            height = 480.dp,
+            width = 960.dp,
+            height = 640.dp,
         )
         Window(
             onCloseRequest = { settingsAnchor = null },
-            title = appInfo.name + strings.trayWindowSettingsSuffix,
+            title = strings.appName + strings.trayWindowSettingsSuffix,
             state = windowState,
+            icon = appIconPainter,
             alwaysOnTop = true,
         ) {
             LinkOpenerTheme(theme = settings.theme) {
-                SettingsScreen(viewModel = settingsViewModel, strings = strings)
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    strings = strings,
+                    appVersion = appInfo.version,
+                    appIconPainter = appIconPainter,
+                    onCloseRequest = { settingsAnchor = null },
+                )
             }
         }
     }
