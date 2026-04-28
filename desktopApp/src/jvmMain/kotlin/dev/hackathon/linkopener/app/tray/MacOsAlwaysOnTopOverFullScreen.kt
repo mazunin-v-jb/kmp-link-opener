@@ -18,10 +18,28 @@ import java.awt.Window
  * to draw above the menu bar (NSStatusWindowLevel).
  *
  * AWT does not expose either property, so we reach through the AWT peer
- * chain via reflection (requires the `--add-opens` JVM args set in
- * desktopApp/build.gradle.kts), then call into libobjc with JNA.
+ * chain via reflection (requires the `--add-exports` / `--add-opens` JVM args
+ * set in desktopApp/build.gradle.kts), then call into libobjc with JNA.
  *
  * Logs each step so misbehaviour is debuggable from gradle/IDEA console.
+ *
+ * **TECHNICAL DEBT — migrate before public release.** Pre-release we should
+ * replace this reflection chain with either:
+ *   - [rococoa](https://github.com/iterate-ch/rococoa) — typed Cocoa
+ *     bindings for the JVM, hides the reflection brittleness behind a
+ *     library, ~500 KB to the dist;
+ *   - or a small native shim (Objective-C compiled to a `.dylib` shipped
+ *     with the app, called via JNA) — most stable but adds cross-compile
+ *     to the build.
+ *
+ * The current approach is brittle to JDK upgrades — `sun.awt.*` /
+ * `sun.lwawt.*` are Oracle-internal and may change shape in any release;
+ * JEP 403 trends point at eventual hard blocking of `--add-opens` for
+ * internals. Current behaviour on failure: graceful fallback (we log
+ * to stderr and the picker still works, just without fullscreen overlay).
+ *
+ * Tracked under the "Future work / Technical debt" section in
+ * `ai_stages/042_browser_picker_popup/plan.md`.
  */
 object MacOsAlwaysOnTopOverFullScreen {
 

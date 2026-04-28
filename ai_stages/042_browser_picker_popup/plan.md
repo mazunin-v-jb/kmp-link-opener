@@ -152,6 +152,56 @@ UI тесты не пишем (Compose UI testing не настроено).
 - [ ] ESC закрывает picker.
 - [ ] Если браузеров > 3 — видно «Show all (N)»; клик раскрывает полный список.
 
+## Future work / Technical debt
+
+### TD-1: заменить reflection в `MacOsAlwaysOnTopOverFullScreen` на устойчивое API
+
+**Что есть сейчас.** `MacOsAlwaysOnTopOverFullScreen` достаёт `NSWindow*` из AWT
+через reflection-цепочку в `sun.awt.AWTAccessor` → `sun.lwawt.LWWindowPeer` →
+`sun.lwawt.macosx.CFRetainedResource.ptr`, потом зовёт `setLevel:` и
+`setCollectionBehavior:` через JNA + libobjc. Требует:
+- `--add-exports java.desktop/sun.awt=ALL-UNNAMED` (и для `sun.lwawt`,
+  `sun.lwawt.macosx`)
+- `--add-opens` тех же пакетов
+- надежды на то, что Oracle не переименует поля во внутренних классах
+
+**Проблема.** `sun.*` — internal API, не public. Любой JDK upgrade может
+сломать reflection-цепочку без предупреждения. JEP 403 (Strongly Encapsulate
+JDK Internals) идёт в сторону полной блокировки `--add-opens` для
+internals. Сейчас уже warning «Restricted methods will be blocked in a
+future release» в логах.
+
+**Это не security-проблема** (mods bypass-flags открывают internals
+**нашему же коду**, не атакующему), но maintainability-долг.
+
+**Текущий fallback.** На любой reflection failure хелпер логирует ошибку и
+тихо отказывает — picker всё равно показывается, просто на macOS
+fullscreen-приложениях рендерится под ними как до фикса.
+
+**Кандидаты на миграцию** (в порядке трудозатрат):
+
+1. **[rococoa](https://github.com/iterate-ch/rococoa)** — типизированные Cocoa
+   bindings для JVM. Спрятать reflection за библиотекой. Добавляет ~500 KB к
+   дистрибутиву, но изолирует нашу кодобазу от изменений в JDK internals.
+   Замена ~30 строк хелпера на ~5 строк типизированных вызовов.
+2. **Свой нативный shim** — мини-библиотека на Objective-C, компилируется в
+   `Picker-Helper.dylib`, ставится в bundle, зовётся через JNA по нормальному
+   ABI без reflection. Самый стабильный путь, но добавляет cross-compile
+   шаг в сборку (`xcrun clang -framework AppKit ...`).
+
+**Acceptance для миграции:**
+- [ ] Хелпер не использует reflection в `sun.*` пакеты
+- [ ] `--add-exports` / `--add-opens` JVM args можно убрать (или хотя бы
+      сократить до того что реально нужно остальному коду)
+- [ ] Smoke-test на macOS Sonoma+/Sequoia: picker overlay'ит fullscreen
+      Safari/Chrome/IDEA (та же проверка что у нас сейчас)
+- [ ] Запустить на свежей версии JBR + Adoptium + Oracle JDK 21/24 чтобы
+      убедиться что миграция совместима со всеми
+
+**Когда делать:** перед публичным релизом / packaging'ом для
+distribution. До тех пор reflection-вариант справляется и graceful fallback
+делает его «безопасно ломающимся».
+
 ## Чувствительные данные
 
 Нет.
