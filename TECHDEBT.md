@@ -24,16 +24,6 @@ Resolved items are removed (git log preserves history) — keep the list short s
 
 ---
 
-## TD-2 — `IsDefaultBrowserUseCase` is dead code
-
-**Where:** `shared/src/commonMain/kotlin/dev/hackathon/linkopener/domain/usecase/IsDefaultBrowserUseCase.kt`.
-
-**What:** Stage 4.1 introduced `IsDefaultBrowserUseCase` as a one-shot probe. The `cd5fbef` polish replaced it with `ObserveIsDefaultBrowserUseCase` (a `Flow<Boolean>` driven by a `WatchService` against the LaunchServices plist), and nothing on the live graph references the original anymore (`AppContainer`, `SettingsViewModel`, all use the Observe variant). The class is still on disk because we didn't want to bundle the cleanup into an unrelated commit.
-
-**Action:** delete `IsDefaultBrowserUseCase.kt` and any test that constructs it (the `SettingsViewModelTest` reference is to a fake VM constructor — verify that's the only thing left). Should be a 1-PR cleanup with no behavior change.
-
----
-
 ## TD-3 — UI-surface coverage gap
 
 **Where:** Kover excludes list in `shared/build.gradle.kts`; numbers in `CLAUDE.md` § "Test coverage".
