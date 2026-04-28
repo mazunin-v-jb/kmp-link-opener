@@ -13,6 +13,7 @@
 > | 4 | Settings persistence (тема/язык/autostart/exclusions) | ✅ |
 > | 4.1 | Детекция default-browser (live через WatchService) + deep-link в System Settings + переписанный сайдбар | ✅ |
 > | 4.2 | Browser picker popup (3 + «Show all», drag, scroll, dismiss-outside) | ✅ |
+> | 4.3 | Ручное добавление браузеров через native file picker | ✅ |
 > | 4.5 | Дизайн-система (M3 colors / typography / brand-icon) | ✅ |
 > | 5 | i18n через Compose Resources XML + locale-flip на click thread | ✅ |
 >

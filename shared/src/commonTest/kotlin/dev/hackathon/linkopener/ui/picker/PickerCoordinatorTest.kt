@@ -241,6 +241,18 @@ class PickerCoordinatorTest {
         override suspend fun setBrowserOrder(order: List<BrowserId>) {
             _settings.update { it.copy(browserOrder = order) }
         }
+        override suspend fun addManualBrowser(browser: Browser) {
+            _settings.update { it.copy(manualBrowsers = it.manualBrowsers + browser) }
+        }
+        override suspend fun removeManualBrowser(id: BrowserId) {
+            _settings.update {
+                it.copy(
+                    manualBrowsers = it.manualBrowsers.filterNot { b ->
+                        BrowserId(b.applicationPath) == id
+                    },
+                )
+            }
+        }
     }
 
     private class RecordingLauncher : LinkLauncher {

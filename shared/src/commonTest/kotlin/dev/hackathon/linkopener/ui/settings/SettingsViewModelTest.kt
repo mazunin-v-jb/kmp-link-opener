@@ -17,6 +17,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
+import dev.hackathon.linkopener.domain.BrowserMetadataExtractor
+import dev.hackathon.linkopener.domain.usecase.AddManualBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.RemoveManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
@@ -142,6 +145,13 @@ class SettingsViewModelTest {
                 setAutoStart = SetAutoStartUseCase(FakeSettingsRepository()),
                 setBrowserExcluded = SetBrowserExcludedUseCase(FakeSettingsRepository()),
                 setBrowserOrder = SetBrowserOrderUseCase(FakeSettingsRepository()),
+                addManualBrowser = AddManualBrowserUseCase(
+                    extractor = NoopExtractor,
+                    settings = FakeSettingsRepository(),
+                    browsers = StaticBrowserRepository(emptyList()),
+                    ownBundleId = "test",
+                ),
+                removeManualBrowser = RemoveManualBrowserUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
                 getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
@@ -283,6 +293,135 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun onManualBrowserPickedNullIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onManualBrowserPicked(null)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyList(), repo.settings.value.manualBrowsers)
+    }
+
+    @Test
+    fun onManualBrowserPickedAddsAndAppearsInBrowsersList() = runTest {
+        val repo = FakeSettingsRepository()
+        val custom = Browser("com.example.fake", "Fake", "/Apps/Fake.app", "1.0")
+        // Use the real repository so the merge path between discovered + manual
+        // is exercised end-to-end.
+        val browserRepo = dev.hackathon.linkopener.data.BrowserRepositoryImpl(
+            discovery = object : dev.hackathon.linkopener.platform.BrowserDiscovery {
+                override suspend fun discover(): List<Browser> = emptyList()
+            },
+            settings = repo,
+        )
+        val vm = newViewModel(
+            repo = repo,
+            scope = this,
+            browserRepository = browserRepo,
+            extractor = object : BrowserMetadataExtractor {
+                override suspend fun extract(path: String) =
+                    BrowserMetadataExtractor.ExtractResult.Success(custom)
+            },
+        )
+        testScheduler.advanceUntilIdle()
+        // Initial state: empty.
+        assertEquals(emptyList(), (vm.browsers.value as BrowsersState.Loaded).browsers)
+
+        vm.onManualBrowserPicked("/Apps/Fake.app")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf(custom), repo.settings.value.manualBrowsers)
+        assertEquals(listOf(custom), (vm.browsers.value as BrowsersState.Loaded).browsers)
+    }
+
+    @Test
+    fun onManualBrowserPickedDuplicateRaisesNotice() = runTest {
+        val repo = FakeSettingsRepository()
+        val existing = Browser("com.example.fake", "Fake", "/Apps/Fake.app", "1.0")
+        repo.emit(repo.settings.value.copy(manualBrowsers = listOf(existing)))
+        val vm = newViewModel(
+            repo = repo,
+            scope = this,
+            // Expose the existing browser through the browser repository (would
+            // be the case in production via BrowserRepositoryImpl's merge of
+            // discovered + manual). Use case checks path presence here.
+            browserRepository = StaticBrowserRepository(listOf(existing)),
+            extractor = object : BrowserMetadataExtractor {
+                override suspend fun extract(path: String) =
+                    BrowserMetadataExtractor.ExtractResult.Success(existing)
+            },
+        )
+
+        vm.onManualBrowserPicked("/Apps/Fake.app")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(ManualAddNotice.Duplicate, vm.manualAddNotice.value)
+    }
+
+    @Test
+    fun onManualBrowserPickedInvalidRaisesNotice() = runTest {
+        val repo = FakeSettingsRepository()
+        val vm = newViewModel(
+            repo = repo,
+            scope = this,
+            extractor = object : BrowserMetadataExtractor {
+                override suspend fun extract(path: String) =
+                    BrowserMetadataExtractor.ExtractResult.Failure("Missing Info.plist")
+            },
+        )
+
+        vm.onManualBrowserPicked("/Apps/Bogus.app")
+        testScheduler.advanceUntilIdle()
+
+        val notice = vm.manualAddNotice.value
+        assertIs<ManualAddNotice.InvalidApp>(notice)
+        assertEquals("Missing Info.plist", notice.reason)
+    }
+
+    @Test
+    fun dismissManualAddNoticeClearsState() = runTest {
+        val repo = FakeSettingsRepository()
+        val vm = newViewModel(
+            repo = repo,
+            scope = this,
+            extractor = object : BrowserMetadataExtractor {
+                override suspend fun extract(path: String) =
+                    BrowserMetadataExtractor.ExtractResult.Failure("nope")
+            },
+        )
+        vm.onManualBrowserPicked("/x.app")
+        testScheduler.advanceUntilIdle()
+        assertIs<ManualAddNotice.InvalidApp>(vm.manualAddNotice.value)
+
+        vm.dismissManualAddNotice()
+
+        assertEquals(null, vm.manualAddNotice.value)
+    }
+
+    @Test
+    fun onRemoveManualBrowserDropsItAndUpdatesList() = runTest {
+        val repo = FakeSettingsRepository()
+        val custom = Browser("com.example.fake", "Fake", "/Apps/Fake.app", "1.0")
+        repo.emit(repo.settings.value.copy(manualBrowsers = listOf(custom)))
+        val browserRepo = dev.hackathon.linkopener.data.BrowserRepositoryImpl(
+            discovery = object : dev.hackathon.linkopener.platform.BrowserDiscovery {
+                override suspend fun discover(): List<Browser> = emptyList()
+            },
+            settings = repo,
+        )
+        val vm = newViewModel(repo = repo, scope = this, browserRepository = browserRepo)
+        testScheduler.advanceUntilIdle()
+        assertEquals(listOf(custom), (vm.browsers.value as BrowsersState.Loaded).browsers)
+
+        vm.onRemoveManualBrowser(BrowserId("/Apps/Fake.app"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyList(), repo.settings.value.manualBrowsers)
+        assertEquals(emptyList(), (vm.browsers.value as BrowsersState.Loaded).browsers)
+    }
+
+    @Test
     fun onBrowserExclusionToggledRemovesBrowser() = runTest {
         val repo = FakeSettingsRepository()
         val vm = newViewModel(repo = repo, scope = this)
@@ -303,6 +442,7 @@ class SettingsViewModelTest {
         browsers: List<Browser> = emptyList(),
         browserRepository: BrowserRepository = StaticBrowserRepository(browsers),
         defaultBrowserService: DefaultBrowserService = FakeDefaultBrowserService(),
+        extractor: BrowserMetadataExtractor = NoopExtractor,
     ): SettingsViewModel = SettingsViewModel(
         getSettings = GetSettingsFlowUseCase(repo),
         updateTheme = UpdateThemeUseCase(repo),
@@ -310,6 +450,13 @@ class SettingsViewModelTest {
         setAutoStart = SetAutoStartUseCase(repo),
         setBrowserExcluded = SetBrowserExcludedUseCase(repo),
         setBrowserOrder = SetBrowserOrderUseCase(repo),
+        addManualBrowser = AddManualBrowserUseCase(
+            extractor = extractor,
+            settings = repo,
+            browsers = browserRepository,
+            ownBundleId = "dev.hackathon.linkopener",
+        ),
+        removeManualBrowser = RemoveManualBrowserUseCase(repo),
         discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
         observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(defaultBrowserService),
         getIsDefaultBrowser = GetIsDefaultBrowserUseCase(defaultBrowserService),
@@ -317,6 +464,11 @@ class SettingsViewModelTest {
         getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(defaultBrowserService),
         scope = scope,
     )
+
+    private object NoopExtractor : BrowserMetadataExtractor {
+        override suspend fun extract(path: String): BrowserMetadataExtractor.ExtractResult =
+            BrowserMetadataExtractor.ExtractResult.Failure("not used")
+    }
 
     private class FakeSettingsRepository : SettingsRepository {
         private val _settings = MutableStateFlow(AppSettings.Default)
@@ -356,6 +508,23 @@ class SettingsViewModelTest {
 
         override suspend fun setBrowserOrder(order: List<BrowserId>) {
             _settings.update { it.copy(browserOrder = order) }
+        }
+
+        override suspend fun addManualBrowser(browser: Browser) {
+            _settings.update {
+                if (it.manualBrowsers.any { b -> b.applicationPath == browser.applicationPath }) it
+                else it.copy(manualBrowsers = it.manualBrowsers + browser)
+            }
+        }
+
+        override suspend fun removeManualBrowser(id: BrowserId) {
+            _settings.update {
+                it.copy(
+                    manualBrowsers = it.manualBrowsers.filterNot { b ->
+                        BrowserId(b.applicationPath) == id
+                    },
+                )
+            }
         }
     }
 

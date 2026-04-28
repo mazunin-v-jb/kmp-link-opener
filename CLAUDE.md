@@ -17,6 +17,7 @@ Status as of latest main:
 | 4 | Settings persistence (theme/lang/autostart/exclusions) | ✅ |
 | 4.1 | Default-browser detection + System Settings deep-link | ✅ (live via WatchService → `Flow<Boolean>`) |
 | 4.2 | Browser picker popup window | ✅ (drag handle + scrolling expanded list + dismiss-outside) |
+| 4.3 | Manual browser addition (file picker → `Info.plist` → settings.manualBrowsers, merged into discovered list and picker) | ✅ |
 | 4.5 | Design system (colors, typography, icons, theme) | ✅ |
 | 5 | i18n via Compose Resources XML + JVM-locale override | ✅ |
 
@@ -24,7 +25,8 @@ Status as of latest main:
 
 Recent additions worth knowing about for context:
 
-- `DefaultBrowserService.observeIsDefaultBrowser(): Flow<Boolean>` — macOS impl watches the LaunchServices preferences plist via `WatchService` so the Settings UI banner flips the moment the user picks a different default elsewhere. Driven by `ObserveIsDefaultBrowserUseCase`. The older `IsDefaultBrowserUseCase` still exists in `domain/usecase/` but nothing in the live graph references it — fair game to delete.
+- `DefaultBrowserService.observeIsDefaultBrowser(): Flow<Boolean>` — macOS impl watches the LaunchServices preferences plist via `WatchService` so the Settings UI banner flips the moment the user picks a different default elsewhere. Driven by `ObserveIsDefaultBrowserUseCase`.
+- Manual browser addition (stage 4.3): `BrowserRepositoryImpl` now also takes `SettingsRepository` and merges `settings.manualBrowsers` (user-added browsers via `+ Add browser…` in Settings) into the discovered list. Discovered wins on path collision. macOS reads `Info.plist` via the existing `InfoPlistReader` machinery; non-mac platforms use `UnsupportedManualBrowserExtractor` until stages 7/8 land. Detail in `ai_stages/043_manual_browser_addition/plan.md`.
 - Picker popup polish: header doubles as a `WindowDraggableArea` drag handle; "Show all" grows the popup from 320 → 480 dp and the full browser list lives in a vertically-scrolled `Column` capped at 6 row heights with a `VerticalScrollbar`. `BrowserPickerScreen` exposes `onExpand` + `headerWrapper` slot so the JVM-only `WindowDraggableArea` plumbing stays in `:desktopApp`.
 - Stage-5 locale strategy diverged from the original plan: instead of `key(resolvedLocale) + DisposableEffect`, we apply `Locale.setDefault` synchronously on the click thread (in `SettingsViewModel.onLanguageSelected`) plus at `AppContainer.init` for the loaded language, and use `LocalAppLocale` (a CompositionLocal nonce) to break Compose's smart-skipping in TopAppBar / NotDefaultBanner / Sidebar. See `ai_stages/05_compose_resources_i18n/plan.md` "Implementation notes" for why.
 

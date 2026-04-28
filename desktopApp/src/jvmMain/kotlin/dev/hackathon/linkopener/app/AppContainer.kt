@@ -4,9 +4,11 @@ import com.russhwolf.settings.Settings
 import dev.hackathon.linkopener.data.AppInfoRepositoryImpl
 import dev.hackathon.linkopener.data.BrowserRepositoryImpl
 import dev.hackathon.linkopener.data.SettingsRepositoryImpl
+import dev.hackathon.linkopener.domain.BrowserMetadataExtractor
 import dev.hackathon.linkopener.domain.repository.AppInfoRepository
 import dev.hackathon.linkopener.domain.repository.BrowserRepository
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
+import dev.hackathon.linkopener.domain.usecase.AddManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetAppInfoUseCase
 import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
@@ -14,6 +16,7 @@ import dev.hackathon.linkopener.domain.usecase.GetIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
+import dev.hackathon.linkopener.domain.usecase.RemoveManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
@@ -57,14 +60,17 @@ class AppContainer {
     private val defaultBrowserService: DefaultBrowserService =
         PlatformFactory.createDefaultBrowserService(ownBundleId = ownBundleId)
     private val linkLauncher: LinkLauncher = PlatformFactory.createLinkLauncher()
+    private val browserMetadataExtractor: BrowserMetadataExtractor =
+        PlatformFactory.createBrowserMetadataExtractor()
 
     private val appInfoRepository: AppInfoRepository = AppInfoRepositoryImpl()
-    private val browserRepository: BrowserRepository = BrowserRepositoryImpl(browserDiscovery)
     private val settingsRepository: SettingsRepository = SettingsRepositoryImpl(
         store = settingsStore,
         json = json,
         autoStartManager = autoStartManager,
     )
+    private val browserRepository: BrowserRepository =
+        BrowserRepositoryImpl(browserDiscovery, settingsRepository)
 
     val getAppInfoUseCase: GetAppInfoUseCase = GetAppInfoUseCase(appInfoRepository)
     val getSettingsFlowUseCase: GetSettingsFlowUseCase = GetSettingsFlowUseCase(settingsRepository)
@@ -75,6 +81,14 @@ class AppContainer {
         SetBrowserExcludedUseCase(settingsRepository)
     val setBrowserOrderUseCase: SetBrowserOrderUseCase =
         SetBrowserOrderUseCase(settingsRepository)
+    val addManualBrowserUseCase: AddManualBrowserUseCase = AddManualBrowserUseCase(
+        extractor = browserMetadataExtractor,
+        settings = settingsRepository,
+        browsers = browserRepository,
+        ownBundleId = ownBundleId,
+    )
+    val removeManualBrowserUseCase: RemoveManualBrowserUseCase =
+        RemoveManualBrowserUseCase(settingsRepository)
 
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
         DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
@@ -135,6 +149,8 @@ class AppContainer {
         setAutoStart = setAutoStartUseCase,
         setBrowserExcluded = setBrowserExcludedUseCase,
         setBrowserOrder = setBrowserOrderUseCase,
+        addManualBrowser = addManualBrowserUseCase,
+        removeManualBrowser = removeManualBrowserUseCase,
         discoverBrowsers = discoverBrowsersUseCase,
         observeIsDefaultBrowser = observeIsDefaultBrowserUseCase,
         getIsDefaultBrowser = getIsDefaultBrowserUseCase,

@@ -16,7 +16,10 @@ import dev.hackathon.linkopener.app.AppContainer
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
+import java.awt.FileDialog
+import java.awt.Frame
 import java.awt.MouseInfo
+import java.io.File
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.app_name
 import kmp_link_opener.shared.generated.resources.tray_menu_quit
@@ -119,6 +122,13 @@ private fun ApplicationScope.TrayHostBody(
                     currentOs = container.currentOs,
                     appIconPainter = appIconPainter,
                     onCloseRequest = { settingsAnchor = null },
+                    onAddBrowserClick = {
+                        // Native macOS file picker via AWT — bundles like .app
+                        // are selectable as files. The path is forwarded to
+                        // the VM, which delegates to AddManualBrowserUseCase.
+                        val path = pickBrowserAppPath()
+                        settingsViewModel.onManualBrowserPicked(path)
+                    },
                 )
             }
         }
@@ -128,4 +138,24 @@ private fun ApplicationScope.TrayHostBody(
 private fun currentCursorPosition(): WindowPosition {
     val location = MouseInfo.getPointerInfo()?.location ?: return WindowPosition.PlatformDefault
     return WindowPosition(x = location.x.dp, y = location.y.dp)
+}
+
+private fun pickBrowserAppPath(): String? {
+    // `apple.awt.use-file-dialog-packages=true` tells AWT FileDialog to treat
+    // macOS bundles (.app / .bundle / .framework / …) as selectable files
+    // instead of folders. Without it, double-clicking a .app navigates *into*
+    // it (Contents/, MacOS/, …) and the user can't actually pick the bundle.
+    // Property must be set before the dialog opens; AWT reads it at show time.
+    System.setProperty("apple.awt.use-file-dialog-packages", "true")
+    val dialog = FileDialog(null as Frame?, "Choose a browser app", FileDialog.LOAD).apply {
+        directory = "/Applications"
+        // Visual filter — only `.app` rows show up. The metadata extractor
+        // re-validates the path defensively, so this is convenience, not a
+        // security boundary.
+        setFilenameFilter { _, name -> name.endsWith(".app") }
+    }
+    dialog.isVisible = true
+    val name = dialog.file ?: return null
+    val dir = dialog.directory ?: return null
+    return File(dir, name).absolutePath
 }

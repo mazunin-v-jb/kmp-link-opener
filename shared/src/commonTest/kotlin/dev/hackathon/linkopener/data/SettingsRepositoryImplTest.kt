@@ -149,6 +149,97 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
+    fun addManualBrowserPersistsAndEmits() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+        val custom = dev.hackathon.linkopener.core.model.Browser(
+            bundleId = "com.example.custom",
+            displayName = "Custom",
+            applicationPath = "/Apps/Custom.app",
+            version = "1.0",
+        )
+
+        repo.addManualBrowser(custom)
+
+        assertEquals(listOf(custom), repo.settings.value.manualBrowsers)
+        assertTrue(store.getStringOrNull("settings.manualBrowsers")!!.contains("com.example.custom"))
+    }
+
+    @Test
+    fun addManualBrowserIsIdempotentByPath() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+        val custom = dev.hackathon.linkopener.core.model.Browser(
+            bundleId = "com.example.custom",
+            displayName = "Custom",
+            applicationPath = "/Apps/Custom.app",
+            version = "1.0",
+        )
+
+        repo.addManualBrowser(custom)
+        // Second add with the same applicationPath — even with different metadata —
+        // must be a no-op (the path is the BrowserId everywhere else in the graph).
+        repo.addManualBrowser(custom.copy(displayName = "Renamed"))
+
+        assertEquals(listOf(custom), repo.settings.value.manualBrowsers)
+    }
+
+    @Test
+    fun removeManualBrowserDropsByPath() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+        val a = dev.hackathon.linkopener.core.model.Browser("a", "A", "/Apps/A.app", null)
+        val b = dev.hackathon.linkopener.core.model.Browser("b", "B", "/Apps/B.app", null)
+        repo.addManualBrowser(a)
+        repo.addManualBrowser(b)
+
+        repo.removeManualBrowser(BrowserId("/Apps/A.app"))
+
+        assertEquals(listOf(b), repo.settings.value.manualBrowsers)
+    }
+
+    @Test
+    fun removeManualBrowserUnknownIdIsNoOp() = runTest {
+        val repo = newRepo()
+        // No throw, no state change.
+        repo.removeManualBrowser(BrowserId("/Apps/Nope.app"))
+        assertEquals(emptyList(), repo.settings.value.manualBrowsers)
+    }
+
+    @Test
+    fun loadsManualBrowsersFromStore() = runTest {
+        val store = FakeSettings()
+        store.putString(
+            "settings.manualBrowsers",
+            """[{"bundleId":"x","displayName":"X","applicationPath":"/X.app","version":null}]""",
+        )
+
+        val repo = newRepo(store = store)
+
+        assertEquals(
+            listOf(
+                dev.hackathon.linkopener.core.model.Browser(
+                    bundleId = "x",
+                    displayName = "X",
+                    applicationPath = "/X.app",
+                    version = null,
+                ),
+            ),
+            repo.settings.value.manualBrowsers,
+        )
+    }
+
+    @Test
+    fun corruptedManualBrowsersJsonFallsBackToEmpty() = runTest {
+        val store = FakeSettings()
+        store.putString("settings.manualBrowsers", "garbage")
+
+        val repo = newRepo(store = store)
+
+        assertEquals(emptyList(), repo.settings.value.manualBrowsers)
+    }
+
+    @Test
     fun corruptedExclusionsJsonFallsBackToEmpty() = runTest {
         val store = FakeSettings()
         store.putString("settings.exclusions", "not-a-json")

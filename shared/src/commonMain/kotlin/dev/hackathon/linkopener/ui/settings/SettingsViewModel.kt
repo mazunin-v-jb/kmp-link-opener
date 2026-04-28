@@ -13,6 +13,8 @@ import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
+import dev.hackathon.linkopener.domain.usecase.AddManualBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.RemoveManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
@@ -32,6 +34,8 @@ class SettingsViewModel(
     private val setAutoStart: SetAutoStartUseCase,
     private val setBrowserExcluded: SetBrowserExcludedUseCase,
     private val setBrowserOrder: SetBrowserOrderUseCase,
+    private val addManualBrowser: AddManualBrowserUseCase,
+    private val removeManualBrowser: RemoveManualBrowserUseCase,
     private val discoverBrowsers: DiscoverBrowsersUseCase,
     observeIsDefaultBrowser: ObserveIsDefaultBrowserUseCase,
     private val getIsDefaultBrowser: GetIsDefaultBrowserUseCase,
@@ -53,6 +57,9 @@ class SettingsViewModel(
     // combine/stateIn coroutine, which keeps `runTest` from completing.
     private val _browsers = MutableStateFlow<BrowsersState>(BrowsersState.Loading)
     val browsers: StateFlow<BrowsersState> = _browsers.asStateFlow()
+
+    private val _manualAddNotice = MutableStateFlow<ManualAddNotice?>(null)
+    val manualAddNotice: StateFlow<ManualAddNotice?> = _manualAddNotice.asStateFlow()
 
     private val _isDefaultBrowser = MutableStateFlow(false)
 
@@ -113,6 +120,41 @@ class SettingsViewModel(
     fun onMoveBrowserUp(id: BrowserId) = reorder(id, -1)
 
     fun onMoveBrowserDown(id: BrowserId) = reorder(id, +1)
+
+    /**
+     * Called from the desktop layer after the file-picker resolves. `null`
+     * means the user cancelled — no-op. On success the use case persists the
+     * browser; we then `loadBrowsers(false)` so the merged list reflects the
+     * newcomer right away.
+     */
+    fun onManualBrowserPicked(path: String?) {
+        if (path.isNullOrBlank()) return
+        scope.launch {
+            when (val result = addManualBrowser(path)) {
+                is AddManualBrowserUseCase.AddResult.Added -> {
+                    _manualAddNotice.value = null
+                    loadBrowsers(forceRefresh = false)
+                }
+                AddManualBrowserUseCase.AddResult.Duplicate ->
+                    _manualAddNotice.value = ManualAddNotice.Duplicate
+                AddManualBrowserUseCase.AddResult.IsSelf ->
+                    _manualAddNotice.value = ManualAddNotice.IsSelf
+                is AddManualBrowserUseCase.AddResult.InvalidApp ->
+                    _manualAddNotice.value = ManualAddNotice.InvalidApp(result.reason)
+            }
+        }
+    }
+
+    fun dismissManualAddNotice() {
+        _manualAddNotice.value = null
+    }
+
+    fun onRemoveManualBrowser(id: BrowserId) {
+        scope.launch {
+            removeManualBrowser(id)
+            loadBrowsers(forceRefresh = false)
+        }
+    }
 
     private fun reorder(id: BrowserId, delta: Int) {
         val state = _browsers.value as? BrowsersState.Loaded ?: return

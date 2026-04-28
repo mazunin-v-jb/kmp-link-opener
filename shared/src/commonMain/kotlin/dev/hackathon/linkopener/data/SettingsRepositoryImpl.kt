@@ -4,7 +4,9 @@ import com.russhwolf.settings.Settings
 import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.core.model.AppTheme
+import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.platform.AutoStartManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,12 +57,29 @@ class SettingsRepositoryImpl(
         _settings.update { it.copy(browserOrder = order) }
     }
 
+    override suspend fun addManualBrowser(browser: Browser) {
+        val current = _settings.value.manualBrowsers
+        if (current.any { it.applicationPath == browser.applicationPath }) return
+        val updated = current + browser
+        store.putString(KEY_MANUAL_BROWSERS, encodeManual(updated))
+        _settings.update { it.copy(manualBrowsers = updated) }
+    }
+
+    override suspend fun removeManualBrowser(id: BrowserId) {
+        val current = _settings.value.manualBrowsers
+        val updated = current.filterNot { it.toBrowserId() == id }
+        if (updated.size == current.size) return
+        store.putString(KEY_MANUAL_BROWSERS, encodeManual(updated))
+        _settings.update { it.copy(manualBrowsers = updated) }
+    }
+
     private fun load(): AppSettings = AppSettings(
         theme = readEnum(KEY_THEME, AppTheme.entries, AppTheme.System),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
         autoStartEnabled = store.getBoolean(KEY_AUTO_START, false),
         excludedBrowserIds = decodeIds(store.getStringOrNull(KEY_EXCLUSIONS)),
         browserOrder = decodeOrder(store.getStringOrNull(KEY_BROWSER_ORDER)),
+        manualBrowsers = decodeManual(store.getStringOrNull(KEY_MANUAL_BROWSERS)),
     )
 
     private fun <E : Enum<E>> readEnum(key: String, values: List<E>, default: E): E {
@@ -91,11 +110,22 @@ class SettingsRepositoryImpl(
         }.getOrDefault(emptyList())
     }
 
+    private fun encodeManual(browsers: List<Browser>): String =
+        json.encodeToString(ListSerializer(Browser.serializer()), browsers)
+
+    private fun decodeManual(raw: String?): List<Browser> {
+        if (raw.isNullOrEmpty()) return emptyList()
+        return runCatching {
+            json.decodeFromString(ListSerializer(Browser.serializer()), raw)
+        }.getOrDefault(emptyList())
+    }
+
     private companion object {
         const val KEY_THEME = "settings.theme"
         const val KEY_LANGUAGE = "settings.language"
         const val KEY_AUTO_START = "settings.autoStart"
         const val KEY_EXCLUSIONS = "settings.exclusions"
         const val KEY_BROWSER_ORDER = "settings.browserOrder"
+        const val KEY_MANUAL_BROWSERS = "settings.manualBrowsers"
     }
 }

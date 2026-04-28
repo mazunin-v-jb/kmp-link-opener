@@ -86,8 +86,13 @@ import kmp_link_opener.shared.generated.resources.default_browser_status_yes
 import kmp_link_opener.shared.generated.resources.excluded as excludedStr
 import kmp_link_opener.shared.generated.resources.help as helpStr
 import kmp_link_opener.shared.generated.resources.included as includedStr
+import kmp_link_opener.shared.generated.resources.manual_add_dismiss
+import kmp_link_opener.shared.generated.resources.manual_add_duplicate
+import kmp_link_opener.shared.generated.resources.manual_add_invalid_prefix
+import kmp_link_opener.shared.generated.resources.manual_add_self
 import kmp_link_opener.shared.generated.resources.move_down
 import kmp_link_opener.shared.generated.resources.move_up
+import kmp_link_opener.shared.generated.resources.remove_manual_browser
 import kmp_link_opener.shared.generated.resources.retry as retryStr
 import kmp_link_opener.shared.generated.resources.refresh_action
 import kmp_link_opener.shared.generated.resources.search_browsers
@@ -112,10 +117,15 @@ fun SettingsScreen(
     currentOs: HostOs,
     appIconPainter: Painter? = null,
     onCloseRequest: () -> Unit = {},
+    // No-op default keeps existing call sites and tests compiling. The
+    // desktopApp wires this to a native AWT FileDialog and forwards the
+    // chosen path into `viewModel.onManualBrowserPicked(...)`.
+    onAddBrowserClick: () -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsState()
     val browsers by viewModel.browsers.collectAsState()
     val isDefault by viewModel.isDefaultBrowser.collectAsState()
+    val manualAddNotice by viewModel.manualAddNotice.collectAsState()
     var activeSection by remember { mutableStateOf(NavSection.DefaultBrowser) }
 
     // Provide a locale nonce so children that don't take any settings-derived
@@ -172,9 +182,15 @@ fun SettingsScreen(
                         NavSection.Exclusions -> ExclusionsSection(
                             browsersState = browsers,
                             excluded = settings.excludedBrowserIds,
+                            manualBrowserIds = settings.manualBrowsers
+                                .mapTo(HashSet()) { BrowserId(it.applicationPath) },
+                            manualAddNotice = manualAddNotice,
                             onToggle = viewModel::onBrowserExclusionToggled,
                             onMoveUp = viewModel::onMoveBrowserUp,
                             onMoveDown = viewModel::onMoveBrowserDown,
+                            onRemoveManual = viewModel::onRemoveManualBrowser,
+                            onAddBrowserClick = onAddBrowserClick,
+                            onDismissManualAddNotice = viewModel::dismissManualAddNotice,
                             onRetry = viewModel::refreshBrowsers,
                         )
                     }
@@ -686,26 +702,75 @@ private fun SystemSection(
 private fun ExclusionsSection(
     browsersState: BrowsersState,
     excluded: Set<BrowserId>,
+    manualBrowserIds: Set<BrowserId>,
+    manualAddNotice: ManualAddNotice?,
     onToggle: (BrowserId, Boolean) -> Unit,
     onMoveUp: (BrowserId) -> Unit,
     onMoveDown: (BrowserId) -> Unit,
+    onRemoveManual: (BrowserId) -> Unit,
+    onAddBrowserClick: () -> Unit,
+    onDismissManualAddNotice: () -> Unit,
     onRetry: () -> Unit,
 ) {
     SectionPane(stringResource(Res.string.section_browser_exclusions), AppIcons.Settings) {
+        if (manualAddNotice != null) {
+            ManualAddNoticeBanner(
+                notice = manualAddNotice,
+                onDismiss = onDismissManualAddNotice,
+            )
+        }
         when (val s = browsersState) {
             BrowsersState.Loading -> LoadingCard()
-            is BrowsersState.Loaded -> if (s.browsers.isEmpty()) {
-                EmptyCard()
-            } else {
-                BrowserList(
-                    browsers = s.browsers,
-                    excluded = excluded,
-                    onToggle = onToggle,
-                    onMoveUp = onMoveUp,
-                    onMoveDown = onMoveDown,
+            is BrowsersState.Loaded -> BrowserList(
+                browsers = s.browsers,
+                excluded = excluded,
+                manualBrowserIds = manualBrowserIds,
+                onToggle = onToggle,
+                onMoveUp = onMoveUp,
+                onMoveDown = onMoveDown,
+                onRemoveManual = onRemoveManual,
+                onAddBrowserClick = onAddBrowserClick,
+            )
+            is BrowsersState.Error -> ErrorCard(s.message, onRetry)
+        }
+    }
+}
+
+@Composable
+private fun ManualAddNoticeBanner(
+    notice: ManualAddNotice,
+    onDismiss: () -> Unit,
+) {
+    val message = when (notice) {
+        ManualAddNotice.Duplicate -> stringResource(Res.string.manual_add_duplicate)
+        ManualAddNotice.IsSelf -> stringResource(Res.string.manual_add_self)
+        is ManualAddNotice.InvalidApp ->
+            stringResource(Res.string.manual_add_invalid_prefix) + notice.reason
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 13.sp),
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = AppIcons.Close,
+                    contentDescription = stringResource(Res.string.manual_add_dismiss),
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
-            is BrowsersState.Error -> ErrorCard(s.message, onRetry)
         }
     }
 }
@@ -763,9 +828,12 @@ private fun ErrorCard(message: String, onRetry: () -> Unit) {
 private fun BrowserList(
     browsers: List<Browser>,
     excluded: Set<BrowserId>,
+    manualBrowserIds: Set<BrowserId>,
     onToggle: (BrowserId, Boolean) -> Unit,
     onMoveUp: (BrowserId) -> Unit,
     onMoveDown: (BrowserId) -> Unit,
+    onRemoveManual: (BrowserId) -> Unit,
+    onAddBrowserClick: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     val visible = remember(query, browsers) {
@@ -785,39 +853,75 @@ private fun BrowserList(
             placeholder = stringResource(Res.string.search_browsers),
         )
         Spacer(Modifier.height(12.dp))
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color = surfaceContainerLowest(),
-                    shape = RoundedCornerShape(12.dp),
-                )
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    shape = RoundedCornerShape(12.dp),
-                ),
+        OutlinedButton(
+            onClick = onAddBrowserClick,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            visible.forEachIndexed { index, browser ->
-                val id = browser.toBrowserId()
-                val absoluteIndex = browsers.indexOf(browser)
-                BrowserRow(
-                    browser = browser,
-                    isExcluded = id in excluded,
-                    canMoveUp = reorderEnabled && absoluteIndex > 0,
-                    canMoveDown = reorderEnabled && absoluteIndex < browsers.lastIndex,
-                    onToggle = { newValue -> onToggle(id, newValue) },
-                    onMoveUp = { onMoveUp(id) },
-                    onMoveDown = { onMoveDown(id) },
-                )
-                if (index != visible.lastIndex) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+            Text(
+                text = stringResource(Res.string.add_browser),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        if (visible.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = surfaceContainerLowest(),
+                        shape = RoundedCornerShape(12.dp),
                     )
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .padding(16.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.browsers_empty),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = surfaceContainerLowest(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+            ) {
+                visible.forEachIndexed { index, browser ->
+                    val id = browser.toBrowserId()
+                    val absoluteIndex = browsers.indexOf(browser)
+                    BrowserRow(
+                        browser = browser,
+                        isExcluded = id in excluded,
+                        isManual = id in manualBrowserIds,
+                        canMoveUp = reorderEnabled && absoluteIndex > 0,
+                        canMoveDown = reorderEnabled && absoluteIndex < browsers.lastIndex,
+                        onToggle = { newValue -> onToggle(id, newValue) },
+                        onMoveUp = { onMoveUp(id) },
+                        onMoveDown = { onMoveDown(id) },
+                        onRemoveManual = { onRemoveManual(id) },
+                    )
+                    if (index != visible.lastIndex) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                        )
+                    }
                 }
             }
         }
@@ -828,11 +932,13 @@ private fun BrowserList(
 private fun BrowserRow(
     browser: Browser,
     isExcluded: Boolean,
+    isManual: Boolean,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onToggle: (Boolean) -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
+    onRemoveManual: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -883,6 +989,15 @@ private fun BrowserRow(
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                 },
             )
+        }
+        if (isManual) {
+            IconButton(onClick = onRemoveManual) {
+                Icon(
+                    imageVector = AppIcons.Close,
+                    contentDescription = stringResource(Res.string.remove_manual_browser),
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                )
+            }
         }
         Spacer(Modifier.width(4.dp))
         Text(

@@ -9,6 +9,7 @@ data class AppSettings(
     val autoStartEnabled: Boolean = false,
     val excludedBrowserIds: Set<BrowserId> = emptySet(),
     val browserOrder: List<BrowserId> = emptyList(),
+    val manualBrowsers: List<Browser> = emptyList(),
 ) {
     companion object {
         val Default = AppSettings()

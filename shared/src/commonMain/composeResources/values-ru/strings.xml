@@ -29,6 +29,11 @@
     <string name="excluded">Исключён</string>
     <string name="move_up">Переместить вверх</string>
     <string name="move_down">Переместить вниз</string>
+    <string name="remove_manual_browser">Удалить вручную добавленный браузер</string>
+    <string name="manual_add_duplicate">Этот браузер уже в списке.</string>
+    <string name="manual_add_self">Нельзя добавить Link Opener сам в себя.</string>
+    <string name="manual_add_invalid_prefix">Не удалось добавить это приложение: </string>
+    <string name="manual_add_dismiss">Скрыть</string>
     <string name="system_default">По умолчанию в системе</string>
     <string name="empty_browsers_message">Установленные браузеры пока не найдены.</string>
 

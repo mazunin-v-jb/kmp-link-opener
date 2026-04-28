@@ -1,8 +1,10 @@
 package dev.hackathon.linkopener.platform
 
+import dev.hackathon.linkopener.domain.BrowserMetadataExtractor
 import dev.hackathon.linkopener.platform.linux.LinuxDefaultBrowserService
 import dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserDiscovery
+import dev.hackathon.linkopener.platform.macos.MacOsBrowserMetadataExtractor
 import dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService
 import dev.hackathon.linkopener.platform.macos.MacOsLinkLauncher
 import dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService
@@ -42,6 +44,13 @@ object PlatformFactory {
         HostOs.Windows,
         HostOs.Linux,
         HostOs.Other -> PrintingLinkLauncher()
+    }
+
+    fun createBrowserMetadataExtractor(): BrowserMetadataExtractor = when (currentOs) {
+        HostOs.MacOs -> MacOsBrowserMetadataExtractor()
+        HostOs.Windows,
+        HostOs.Linux,
+        HostOs.Other -> UnsupportedManualBrowserExtractor()
     }
 
     private fun detectHostOs(): HostOs =

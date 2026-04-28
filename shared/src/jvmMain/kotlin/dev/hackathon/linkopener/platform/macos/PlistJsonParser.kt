@@ -20,6 +20,34 @@ open class PlistJsonParser(
 
         if (!handlesHttpOrHttps(root)) return null
 
+        return browserFrom(root, applicationPath)
+    }
+
+    /**
+     * Same metadata extraction as [parseBrowser] but without the http/https
+     * URL-types gate. Used for manually-added browsers — the extractor calls
+     * [isLinkHandler] separately so it can surface "missing CFBundleIdentifier"
+     * vs. "not a link handler" as distinct error reasons.
+     */
+    open fun parseAnyApp(jsonText: String, applicationPath: Path): Browser? {
+        val root = runCatching { json.parseToJsonElement(jsonText).jsonObject }.getOrNull()
+            ?: return null
+        return browserFrom(root, applicationPath)
+    }
+
+    /**
+     * Returns true iff the plist declares `http` or `https` under
+     * `CFBundleURLTypes[].CFBundleURLSchemes` — the same predicate
+     * `MacOsBrowserDiscovery` uses to classify auto-discovered apps as
+     * browsers, so manual addition stays consistent with discovery.
+     */
+    open fun isLinkHandler(jsonText: String): Boolean {
+        val root = runCatching { json.parseToJsonElement(jsonText).jsonObject }.getOrNull()
+            ?: return false
+        return handlesHttpOrHttps(root)
+    }
+
+    private fun browserFrom(root: JsonObject, applicationPath: Path): Browser? {
         val bundleId = root.string("CFBundleIdentifier") ?: return null
 
         val displayName = root.string("CFBundleDisplayName")
