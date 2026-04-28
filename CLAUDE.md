@@ -39,7 +39,7 @@ Recent additions worth knowing about for context:
 - **Placeholder icons:** mark with `TODO` and call out in chat. Stage 4.5 replaced the original placeholder with `app_icon.png`; the tray loader is in `desktopApp/.../tray/TrayIconLoader.kt`.
 - **Sensitive data — STOP AND ASK.** Signing identities, app-specific passwords, etc. live in `~/.gradle/gradle.properties` (outside the repo). The notarization keychain profile is created once via `xcrun notarytool store-credentials` and referenced by name only. Never commit secrets.
 - For each new stage, create `ai_stages/<NN>_<name>/plan.md` describing the implementation in detail before coding.
-- **Bump version before push to `main`.** Increment the patch component of `linkopener.version` in root `gradle.properties` (e.g. `1.0.0` → `1.0.1`). It is the single source of truth — fed into both the DMG packaging metadata (`composePackageVersion`) and the runtime `AppInfo.version` shown in Settings. Format: `MAJOR.MINOR.PATCH` with `MAJOR ≥ 1` (the DMG packager rejects `0.x.y`).
+- **Bump version before push to `main`.** Increment the patch component of `linkopener.version` in root `gradle.properties` (e.g. `1.0.0` → `1.0.1`). It is the single source of truth — fed into both the DMG packaging metadata (`composePackageVersion`) and the runtime `AppInfo.version` shown in Settings. Format: `MAJOR.MINOR.PATCH` with `MAJOR ≥ 1` (the DMG packager rejects `0.x.y`). The same rule applies during conflict resolution: if `linkopener.version` shows up in a rebase/merge conflict, the resolved value must be **bumped past whichever side it landed on** (pick the higher of the two and add `+0.0.1`). Silently keeping the older version is a workflow violation.
 
 ## Build & test commands
 
