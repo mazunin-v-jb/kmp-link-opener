@@ -7,7 +7,7 @@ import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
-import dev.hackathon.linkopener.domain.usecase.IsDefaultBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
@@ -16,8 +16,11 @@ import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
@@ -27,7 +30,7 @@ class SettingsViewModel(
     private val setAutoStart: SetAutoStartUseCase,
     private val setBrowserExcluded: SetBrowserExcludedUseCase,
     private val discoverBrowsers: DiscoverBrowsersUseCase,
-    private val isDefaultBrowserUseCase: IsDefaultBrowserUseCase,
+    observeIsDefaultBrowser: ObserveIsDefaultBrowserUseCase,
     private val openDefaultBrowserSettings: OpenDefaultBrowserSettingsUseCase,
     getCanOpenSystemSettings: GetCanOpenSystemSettingsUseCase,
     private val scope: CoroutineScope,
@@ -44,18 +47,18 @@ class SettingsViewModel(
     private val _browsers = MutableStateFlow<BrowsersState>(BrowsersState.Loading)
     val browsers: StateFlow<BrowsersState> = _browsers.asStateFlow()
 
-    private val _isDefaultBrowser = MutableStateFlow(false)
-    val isDefaultBrowser: StateFlow<Boolean> = _isDefaultBrowser.asStateFlow()
+    // Live binding: macOS overrides DefaultBrowserService.observeIsDefaultBrowser
+    // with a WatchService against the LaunchServices preferences plist, so when
+    // the user picks a different default in System Settings (or any installer
+    // changes the binding) the indicator flips without us polling. Other
+    // platforms get a one-shot emission via the interface's default impl until
+    // their service grows a real watcher.
+    val isDefaultBrowser: StateFlow<Boolean> = observeIsDefaultBrowser()
+        .catch { emit(false) }
+        .stateIn(scope, SharingStarted.Eagerly, initialValue = false)
 
     init {
         refreshBrowsers()
-        recheckDefaultBrowser()
-        // TODO: react to default-browser changes that happen while the app is
-        //  running — the macOS LaunchServices binding lives in a system plist
-        //  with no JDK notification API, so options are file-watching the plist
-        //  in MacOsDefaultBrowserService (Flow<Boolean> through the service
-        //  interface) or hooking window-focus in SettingsScreen. Picking one is
-        //  parked until the stage 4.x team settles on a refresh model.
     }
 
     fun onThemeSelected(theme: AppTheme) {
@@ -91,12 +94,6 @@ class SettingsViewModel(
             } catch (t: Throwable) {
                 _browsers.value = BrowsersState.Error(t.message ?: "Browser discovery failed")
             }
-        }
-    }
-
-    fun recheckDefaultBrowser() {
-        scope.launch {
-            _isDefaultBrowser.value = runCatching { isDefaultBrowserUseCase() }.getOrDefault(false)
         }
     }
 

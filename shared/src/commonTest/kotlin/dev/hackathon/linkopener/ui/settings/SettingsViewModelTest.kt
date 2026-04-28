@@ -10,7 +10,10 @@ import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
-import dev.hackathon.linkopener.domain.usecase.IsDefaultBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
@@ -122,6 +125,43 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun isDefaultBrowserPicksUpServiceFlowEmissions() = runTest {
+        // The live observer is a never-completing StateFlow, so we run the
+        // ViewModel on an isolated scope that we cancel at the end. Without
+        // this isolation, `runTest` would wait forever on the collect{} that
+        // the ViewModel's stateIn(...) keeps alive.
+        val vmScope = CoroutineScope(coroutineContext + Job())
+        try {
+            val service = ControllableDefaultBrowserService(initial = false)
+            val vm = SettingsViewModel(
+                getSettings = GetSettingsFlowUseCase(FakeSettingsRepository()),
+                updateTheme = UpdateThemeUseCase(FakeSettingsRepository()),
+                updateLanguage = UpdateLanguageUseCase(FakeSettingsRepository()),
+                setAutoStart = SetAutoStartUseCase(FakeSettingsRepository()),
+                setBrowserExcluded = SetBrowserExcludedUseCase(FakeSettingsRepository()),
+                discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
+                observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
+                openDefaultBrowserSettings = OpenDefaultBrowserSettingsUseCase(service),
+                getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(service),
+                scope = vmScope,
+            )
+
+            testScheduler.advanceUntilIdle()
+            assertEquals(false, vm.isDefaultBrowser.value)
+
+            service.emit(true)
+            testScheduler.advanceUntilIdle()
+            assertEquals(true, vm.isDefaultBrowser.value)
+
+            service.emit(false)
+            testScheduler.advanceUntilIdle()
+            assertEquals(false, vm.isDefaultBrowser.value)
+        } finally {
+            vmScope.cancel()
+        }
+    }
+
+    @Test
     fun openSystemSettingsDelegatesToService() = runTest {
         val service = FakeDefaultBrowserService()
         val vm = newViewModel(
@@ -188,7 +228,7 @@ class SettingsViewModelTest {
         setAutoStart = SetAutoStartUseCase(repo),
         setBrowserExcluded = SetBrowserExcludedUseCase(repo),
         discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
-        isDefaultBrowserUseCase = IsDefaultBrowserUseCase(defaultBrowserService),
+        observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(defaultBrowserService),
         openDefaultBrowserSettings = OpenDefaultBrowserSettingsUseCase(defaultBrowserService),
         getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(defaultBrowserService),
         scope = scope,
@@ -250,5 +290,19 @@ class SettingsViewModelTest {
             openCount += 1
             return true
         }
+    }
+
+    /**
+     * Test double that lets the test push new "is default" values through the
+     * `observeIsDefaultBrowser` flow at will, mimicking the live updates the
+     * macOS WatchService produces in production.
+     */
+    private class ControllableDefaultBrowserService(initial: Boolean = false) : DefaultBrowserService {
+        private val state = MutableStateFlow(initial)
+        override val canOpenSystemSettings: Boolean = true
+        override suspend fun isDefaultBrowser(): Boolean = state.value
+        override fun observeIsDefaultBrowser(): kotlinx.coroutines.flow.Flow<Boolean> = state
+        override suspend fun openSystemSettings(): Boolean = true
+        fun emit(value: Boolean) { state.value = value }
     }
 }

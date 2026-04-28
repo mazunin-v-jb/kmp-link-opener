@@ -11,7 +11,7 @@ import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetAppInfoUseCase
 import dev.hackathon.linkopener.domain.usecase.GetCanOpenSystemSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
-import dev.hackathon.linkopener.domain.usecase.IsDefaultBrowserUseCase
+import dev.hackathon.linkopener.domain.usecase.ObserveIsDefaultBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.OpenDefaultBrowserSettingsUseCase
 import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
@@ -74,8 +74,8 @@ class AppContainer {
 
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
         DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
-    val isDefaultBrowserUseCase: IsDefaultBrowserUseCase =
-        IsDefaultBrowserUseCase(defaultBrowserService)
+    val observeIsDefaultBrowserUseCase: ObserveIsDefaultBrowserUseCase =
+        ObserveIsDefaultBrowserUseCase(defaultBrowserService)
     val openDefaultBrowserSettingsUseCase: OpenDefaultBrowserSettingsUseCase =
         OpenDefaultBrowserSettingsUseCase(defaultBrowserService)
     val getCanOpenSystemSettingsUseCase: GetCanOpenSystemSettingsUseCase =
@@ -129,7 +129,7 @@ class AppContainer {
         setAutoStart = setAutoStartUseCase,
         setBrowserExcluded = setBrowserExcludedUseCase,
         discoverBrowsers = discoverBrowsersUseCase,
-        isDefaultBrowserUseCase = isDefaultBrowserUseCase,
+        observeIsDefaultBrowser = observeIsDefaultBrowserUseCase,
         openDefaultBrowserSettings = openDefaultBrowserSettingsUseCase,
         getCanOpenSystemSettings = getCanOpenSystemSettingsUseCase,
         scope = coroutineScope,
