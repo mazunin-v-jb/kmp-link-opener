@@ -67,6 +67,15 @@ compose.desktop {
             packageVersion = composePackageVersion
             macOS {
                 bundleID = "dev.hackathon.linkopener"
+                // Bundle icon shown in Finder, the Dock, the Cmd-Tab switcher,
+                // and System Settings → Default Web Browser. macOS expects
+                // `.icns` (a multi-resolution container — we ship sizes from
+                // 16 to 1024 px). The file is checked in so a clean checkout
+                // doesn't need ImageMagick; regenerate by running
+                // `desktopApp/icon/regenerate.sh` whenever the source SVG
+                // (`shared/src/commonMain/composeResources/drawable/app_logo_v2.svg`)
+                // changes.
+                iconFile.set(project.file("icon/AppIcon.icns"))
                 infoPlist {
                     // CFBundleDocumentTypes for public.html and ASWebAuthenticationSessionWebBrowserSupportCapabilities
                     // are what macOS Sonoma+ uses to qualify an app as a "real" web browser
@@ -117,6 +126,21 @@ compose.desktop {
                         identity.set(signingIdentity)
                     }
                 }
+            }
+            // Windows expects `.ico` (multi-resolution container, 16/32/64/
+            // 128/256). Regenerated alongside the macOS one by the same
+            // `regenerate.sh` script. The plugin only consumes this when
+            // packaging on a Windows host (`packageMsi`); on macOS it sits
+            // inert.
+            windows {
+                iconFile.set(project.file("icon/AppIcon.ico"))
+            }
+            // Linux DEB/RPM packagers want a single PNG (jpackage downscales
+            // to whatever the desktop environment requests). 512×512 is the
+            // common sweet spot — big enough for HiDPI app drawers, small
+            // enough to keep .deb size sensible.
+            linux {
+                iconFile.set(project.file("icon/AppIcon.png"))
             }
         }
     }
