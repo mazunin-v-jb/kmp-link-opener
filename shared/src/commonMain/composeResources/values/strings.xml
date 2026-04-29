@@ -50,8 +50,8 @@
     <string name="rule_remove_content_description">Remove rule</string>
     <string name="show_browser_profiles_title">Show browser profiles</string>
     <string name="show_browser_profiles_description">When off, multi-profile browsers like Chrome show as one row. Rules and exclusions referencing specific profiles will not match while disabled.</string>
-    <string name="show_close_button_title">Show close button in picker</string>
-    <string name="show_close_button_description">When on, a close button appears in the picker popup header so you can dismiss it without pressing Escape or clicking outside.</string>
+    <string name="show_close_button_title">Show close button in Settings</string>
+    <string name="show_close_button_description">When on, a close button appears in the Settings window header. The window can always be closed via the system title bar.</string>
     <string name="system_default">System Default</string>
     <string name="empty_browsers_message">No installed browsers detected yet.</string>
 

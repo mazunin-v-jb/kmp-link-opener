@@ -44,6 +44,7 @@ private const val EASTER_EGG_PROBABILITY = 0.05f
 internal fun SettingsTopAppBar(
     onRefresh: () -> Unit,
     onCloseRequest: () -> Unit,
+    showCloseButton: Boolean = true,
 ) {
     useLocaleNonce()
     val appName = stringResource(Res.string.app_name)
@@ -111,13 +112,15 @@ internal fun SettingsTopAppBar(
                     )
                 }
             }
-            TopBarTooltip(text = closeTooltip) {
-                IconButton(onClick = onCloseRequest) {
-                    Icon(
-                        painter = AppIcons.Close,
-                        contentDescription = closeTooltip,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            if (showCloseButton) {
+                TopBarTooltip(text = closeTooltip) {
+                    IconButton(onClick = onCloseRequest) {
+                        Icon(
+                            painter = AppIcons.Close,
+                            contentDescription = closeTooltip,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

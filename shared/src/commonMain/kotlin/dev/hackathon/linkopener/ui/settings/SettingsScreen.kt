@@ -93,6 +93,7 @@ fun SettingsScreen(
                     SettingsTopAppBar(
                         onRefresh = viewModel::refresh,
                         onCloseRequest = onCloseRequest,
+                        showCloseButton = settings.showCloseButton,
                     )
                     if (!isDefault) {
                         NotDefaultBanner(

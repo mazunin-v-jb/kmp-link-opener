@@ -31,7 +31,6 @@ fun ApplicationScope.PickerWindow(
     icons: Map<String, ImageBitmap>,
     onPick: (Browser) -> Unit,
     onDismiss: () -> Unit,
-    showCloseButton: Boolean = false,
 ) {
     val windowState = rememberWindowState(
         position = currentCursorWindowPosition(),
@@ -76,7 +75,6 @@ fun ApplicationScope.PickerWindow(
             url = url,
             browsers = browsers,
             onPick = onPick,
-            onDismiss = if (showCloseButton) onDismiss else null,
             // "Show all" grows the popup downward so the previously hidden
             // browsers fit alongside the original three, with the whole list
             // scrollable inside.

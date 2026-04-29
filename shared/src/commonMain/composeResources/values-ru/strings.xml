@@ -43,7 +43,7 @@
     <string name="show_browser_profiles_title">Показывать профили браузеров</string>
     <string name="show_browser_profiles_description">Когда выключено, мультипрофильные браузеры (Chrome и др.) показываются одной строкой. Правила и исключения, привязанные к конкретным профилям, не сматчатся пока флаг выключен.</string>
     <string name="show_close_button_title">Показывать кнопку закрытия</string>
-    <string name="show_close_button_description">Когда включено, в шапке окна выбора браузера появляется кнопка ×, чтобы закрыть его без нажатия Escape или клика мимо.</string>
+    <string name="show_close_button_description">Когда включено, в шапке окна настроек появляется кнопка закрытия. Окно всегда можно закрыть через системную строку заголовка.</string>
     <string name="system_default">По умолчанию в системе</string>
     <string name="empty_browsers_message">Установленные браузеры пока не найдены.</string>
 
