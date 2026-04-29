@@ -1,787 +1,481 @@
-# Refactoring inspection — plan.md
+# Refactoring inspection — round 2
 
-Status: **landed** (single squashed commit on the refactoring branch).
+Status: **partially landed**.
 
-Items shipped in this sweep:
-- ✅ #1 Split `SettingsScreen.kt` (1,406 → 168 lines + 13 focused files)
-- ✅ #3 Generic JSON helpers in `SettingsRepositoryImpl`
-- ✅ #4 Mutex around all repo writes
-- ✅ #6 Shared `surfaceContainer*` + `BrowserAvatar` between Settings & picker
-- ✅ #7 `mutateRules` helper collapses 5 rule mutators
-- ✅ #9 `DebugFlags` single source of truth
-- ✅ #12 Drop `AppLanguage` FQN in `AppContainer`
-- ✅ #13 Re-indent `CompositionLocalProvider` body (bundled into #1)
-- ✅ #14 `useLocaleNonce()` discoverable helper
-- ✅ #15 Split `MacOsBrowserDiscovery.discover` into named helpers
-- ✅ #16 Drop stale `// region` markers (bundled into #1)
+- ✅ Sweep 2A (test-safe items, this commit): **R4, R5, R7, R8**.
+- 🟠 Pulled out of sweep 2A as *not* test-safe: **R1, R9**. Now alongside
+  the originally-deferred items.
+- ⏭ Deferred (need explicit OK on test changes or further design discussion):
+  **R1, R2, R3, R6, R9, R10, R11**.
 
-Items deferred:
-- ⏭ #2 Use-case explosion — needs explicit OK on test-signature changes
-- ⏭ #5 Wide `SettingsRepository` interface — plan recommended "C for now"
-- ⏭ #8 `AppContainer` subgraphs — gated on #2
-- ⏭ #10 Dead `surfaceContainerLowest` — fell out naturally during #6
-- ⏭ #11 `MacOsLinkLauncher` default factory — recommendation was leave-as-is
+This supersedes the round-1 plan. Round 1 landed as commit `69ac921` on main
+(Settings UI split, design helpers shared, repo polish, etc.) — every item
+marked "✅ landed" in the previous version is in main now. Round 2 is a fresh
+top-to-bottom inspection looking for *what still doesn't sit right* once the
+easy wins are gone.
 
-Below is the original inspection that drove the work, kept for reference.
+**Hard constraint reaffirmed:** *do not change tests* unless the user
+explicitly opts in per item. Each variant below is annotated with whether it
+preserves test signatures (✅) or would force test updates (🟠).
+
+**Non-goals:** features, dep upgrades, behaviour changes, Compose perf
+micro-optimisations, design-system changes.
 
 ---
 
-This is an inventory of refactoring opportunities found by reading every
-production `.kt` file in the repo. Each finding lists the **problem**,
-**why it matters**, two or more **variants** to fix it (cheapest → most
-invasive), and a **recommendation**.
+## 0. Inventory snapshot (post round 1)
 
-**Hard constraint from the user:** *do not touch tests*. Every variant below
-is annotated with whether it preserves test signatures or not. Variants that
-would force test changes are flagged 🟠 and need explicit user approval before
-we proceed.
+Production Kotlin: **6,042 lines across 90 files** (was 5,652 / 75 — the +600
+line / +15 file delta comes mostly from splitting SettingsScreen.kt into
+focused files).
 
-**Non-goals:** behaviour changes, new features, dependency upgrades, cosmetic
-rewrites without rationale, design-system overhauls. We're only making the
-existing code easier to navigate, easier to reason about, and easier to
-extend.
+Top 10 by size:
 
----
+| Lines | File |
+| ----: | --- |
+|   370 | `shared/.../ui/settings/sections/ExclusionsSection.kt` |
+|   287 | `shared/.../ui/settings/SettingsViewModel.kt` |
+|   276 | `shared/.../ui/settings/sections/RulesSection.kt` |
+|   240 | `shared/.../ui/picker/BrowserPickerScreen.kt` |
+|   233 | `desktopApp/.../app/AppContainer.kt` |
+|   207 | `shared/.../ui/icons/AppIcons.kt` |
+|   190 | `desktopApp/.../app/SingleInstanceGuard.kt` |
+|   185 | `desktopApp/.../app/tray/TrayHost.kt` |
+|   168 | `shared/.../ui/settings/SettingsScreen.kt` |
+|   157 | `shared/.../ui/settings/components/Sidebar.kt` |
 
-## 0. Inventory snapshot
-
-Production Kotlin (`*.kt`, no tests, no generated): **5,652 lines across 75 files.**
-
-Top 10 files by size:
-
-| Lines | File                                                                |
-| ----: | ------------------------------------------------------------------- |
-|  1445 | `shared/.../ui/settings/SettingsScreen.kt`                          |
-|   289 | `shared/.../ui/settings/SettingsViewModel.kt`                       |
-|   278 | `shared/.../ui/picker/BrowserPickerScreen.kt`                       |
-|   238 | `desktopApp/.../app/AppContainer.kt`                                |
-|   207 | `shared/.../ui/icons/AppIcons.kt`                                   |
-|   190 | `desktopApp/.../app/SingleInstanceGuard.kt`                         |
-|   185 | `desktopApp/.../app/tray/TrayHost.kt`                               |
-|   158 | `shared/.../data/SettingsRepositoryImpl.kt`                         |
-|   157 | `desktopApp/.../app/tray/MacOsAlwaysOnTopOverFullScreen.kt`         |
-|   144 | `shared/.../ui/theme/LinkOpenerColors.kt`                           |
-
-Use cases in `shared/.../domain/usecase/`: **16** files, of which **14 are
-single-line pass-throughs** and **2 carry real logic** (`AddManualBrowserUseCase`,
-`DiscoverBrowsersUseCase`).
-
-`SettingsRepository` interface: **10 methods**, **1 production impl**, **5+
-test fakes** scattered across test files (every fake re-implements all 10
-methods, mostly with `error("not used")`).
+No file in production code is now over 400 lines — UI surface is healthy.
+The biggest remaining outliers are `ExclusionsSection.kt` (one cohesive section,
+acceptable) and `SettingsViewModel.kt` (still bloated by use-case ceremony).
 
 ---
 
-## 1. `SettingsScreen.kt` is a 1,445-line god-file
+## 1. What's already clean — leave it alone
 
-### Problem
+These pieces survived inspection without remarks. Future "improvements" to
+them risk regressing actually-good architecture.
 
-One Kotlin source mixes ~30 composables across **9 unrelated UI areas**:
-top-bar, banner, sidebar, section scaffolding, default-browser pane,
-appearance/language/system panes, exclusions list (with notice banner +
-loading/empty/error states + browser row + search), rules list (with rule
-row + browser dropdown), and shared widgets (icon box, dropdown, surface
-helpers).
-
-The author already left `// region` markers for every block — they're a
-roadmap pleading for a split.
-
-### Why it matters
-
-- Navigation cost: every change to a tiny composable means scrolling
-  through hundreds of lines of unrelated UI.
-- Recompile cost: a one-line edit recompiles the whole file (Kotlin's
-  per-file granularity).
-- Review cost: PR diffs in this file are nearly unreadable in any UI.
-- Future moves to compose-ui-test (mentioned in `CLAUDE.md`) become much
-  cheaper if each section is independently importable.
-
-### Variants
-
-**A. Split along the existing region markers (recommended).**
-Create one file per region:
-- `ui/settings/SettingsScreen.kt` (entry point + nav state + the `when` switch — ~80 lines)
-- `ui/settings/components/TopAppBar.kt`
-- `ui/settings/components/NotDefaultBanner.kt`
-- `ui/settings/components/Sidebar.kt`
-- `ui/settings/components/SectionScaffold.kt` (`SectionPane` + `SectionCard`)
-- `ui/settings/sections/DefaultBrowserSection.kt`
-- `ui/settings/sections/AppearanceSection.kt` + `LanguageSection.kt` + `SystemSection.kt` (could stay in one `SimpleSections.kt` since each is ~25 lines)
-- `ui/settings/sections/ExclusionsSection.kt` (with its `BrowserList`/`BrowserRow`/`ManualAddNoticeBanner`/`Loading`/`Empty`/`Error` helpers)
-- `ui/settings/sections/RulesSection.kt` (with `RuleRow` + `BrowserDropdown`)
-- `ui/settings/components/SharedWidgets.kt` (`BrowserIconBox`, `SearchField`, `EnumDropdown`, `surfaceContainerLow`, `surfaceContainerLowest`)
-
-All composables become `internal` so test files in
-`ui.settings.*` packages can still reach them; private→internal is a
-visibility *widening*, so every existing reference keeps compiling. **No
-test signatures change.** ✅
-
-**B. Smaller split: 3 files.**
-Top file (entry point + scaffolding + simple sections), one file for
-exclusions, one file for rules. Cheapest move; reduces SettingsScreen.kt
-to ~600 lines without finer separation. Still test-safe. ✅
-
-**C. Leave it alone.** Kotlin compiles fast enough; risk-free.
-
-### Recommendation
-
-**A**, in one PR. The split is mechanical (cut + paste + add private→internal
-on the moved fns). Tests don't import any private composables, so this is
-risk-free.
+- **`RuleEngine`** — well-isolated pure-domain class with documented seam
+  points (`extractTarget`, `findFirstApplicable`, exclusion / missing-browser
+  branches). Easy to test, easy to evolve. Don't touch.
+- **`HostGlobMatcher`** — single-purpose object, tight regex compilation
+  with a documented cookie-domain shortcut. Comprehensive test coverage.
+- **`SettingsRepositoryImpl`** (post round 1) — `Mutex`-serialized writes,
+  generic `readJson`/`writeJson`, single companion of cached serializers.
+  Good shape.
+- **`MacOsBrowserDiscovery.discover()`** (post round 1) — four-line summary
+  delegating to two named helpers. Clean.
+- **`SingleInstanceGuard.acquireOrSignal`** — careful resource ordering
+  (lock then socket then port file; reverse-unwind on each failure).
+  Actually a model of how to write JVM-y resource-acquisition code. Don't
+  "simplify" the early-return chain; it's already as flat as it gets.
+- **Domain models in `core/model/`** — small, immutable, `@Serializable`
+  where needed. `BrowserId` as a `@JvmInline value class` is the right call.
+- **The "single point of decision" pattern** documented in stage plans
+  (`RuleEngine` for rule policy, `BrowserRepositoryImpl.collapseProfilesIfDisabled`
+  for profile collapse, `applyJvmLocale`/`resolveLocaleTag` for locale
+  resolution). Keep this convention for new features.
 
 ---
 
-## 2. Use-case explosion: 14 of 16 are pass-through one-liners
+## 2. Items from round 1 still open
 
-### Problem
+These were deferred, not abandoned. Their analysis hasn't changed; bringing
+them up here so the new plan is the single point of reference.
 
-The `domain/usecase/` package has 16 classes. Most look like:
+| Old # | Item | Status today |
+| --- | --- | --- |
+| #2 | Use-case collapse (14 of 16 are pass-through one-liners) | 🟠 needs test edits — see new finding **R3** below for an updated take |
+| #5 | Wide `SettingsRepository` interface (10 methods, 5+ test fakes) | Still "C for now" per round 1; revisit if interface keeps growing |
+| #8 | `AppContainer` flat 200-line wiring | Gated on R3 — solved by it; revisit afterward |
+
+---
+
+## 3. New findings (round 2)
+
+Numbered **R1, R2, …** to distinguish from round-1 numbering and to keep
+cross-references unambiguous.
+
+### R1. `SettingsViewModel` doesn't own its `CoroutineScope`
+
+**Files**: `shared/.../ui/settings/SettingsViewModel.kt:49`,
+`desktopApp/.../app/AppContainer.kt:51` + `:198`.
+
+**Problem**: VM takes `scope: CoroutineScope` as a constructor dependency.
+AppContainer passes its long-lived `Main`-bound `SupervisorJob` scope. The VM
+launches three persistent collectors at init (`observeIsDefaultBrowser`,
+initial discovery, initial default-browser read) and never cancels them.
+
+In practice today this is benign — `newSettingsViewModel()` is called exactly
+once via `remember(container) { ... }` in `TrayHost`. But:
+- If the user closes Settings, the VM's collectors keep running forever
+  (Main thread holds them until process exit).
+- If `newSettingsViewModel()` were ever called twice, the first VM's coroutines
+  would leak and continue writing to its dropped `_browsers`/`_isDefaultBrowser`
+  state flows.
+- It violates the "VM owns its lifecycle" contract that every other VM I've
+  ever seen follows.
+
+**Why it matters**: Architectural cleanliness aside, this is a footgun
+waiting for someone to add a "reset settings" feature that recreates the VM.
+
+**Variants**:
+- **A. VM creates its own `CoroutineScope`** from `SupervisorJob() + dispatcher`
+  (dispatcher injected for tests). Adds a public `dispose()` method. Keep
+  the `scope` constructor parameter as `dispatcher: CoroutineDispatcher` for
+  test injection. ✅ test-safe — tests pass `Dispatchers.Unconfined` (or use
+  the existing `runTest` scheduler) and call `dispose()` in teardown.
+- **B. VM accepts `parent: Job?` and creates a child** so cancellation
+  cascades from a parent. More plumbing; less independent.
+- **C. Leave it.** Acceptable today. Document the assumption in a class
+  KDoc.
+
+**Recommendation**: **A**. Small change, real architectural win.
+
+### R2. `applyLocale` callback in commonMain VM is a JVM-Locale leak
+
+**Files**: `shared/.../ui/settings/SettingsViewModel.kt:54, :106-115`,
+`desktopApp/.../app/AppContainer.kt:199, :206-211`.
+
+**Problem**: `SettingsViewModel.onLanguageSelected` takes
+`applyLocale: (AppLanguage) -> Unit` and calls it *synchronously on the click
+thread before the suspending update fires*, to win a race against the Window
+subcomposition. The VM lives in `commonMain` but the only sensible
+implementation of `applyLocale` is `java.util.Locale.setDefault` — a JVM API.
+
+This means the commonMain VM is shaped around a JVM concern. The default
+no-op (`{}`) lets tests not care, but the contract leaks.
+
+**Why it matters**: If we ever add a non-JVM target (which the project's KMP
+shape suggests we might want to), `AppLanguage` selection is half-broken
+without re-implementing the JVM trick on each platform. Today it's also a
+puzzle for new readers — *"why does the VM call a callback before launching
+the coroutine?"*.
+
+**Variants**:
+- **A. Move the locale flip out of the VM entirely.** Create a
+  `LocaleApplier` JVM service that observes `settings.language` flow on a
+  high-priority dispatcher and calls `setDefault` synchronously. Wire it in
+  AppContainer. VM no longer takes `applyLocale`. The Compose race is
+  re-fought *outside* commonMain. ✅ test-safe — VM constructor loses a
+  parameter (default makes existing tests still pass).
+- **B. Make `applyLocale` an injected `LocaleApplier` interface** (still
+  passed to VM) so commonMain has the abstraction even if the JVM is the
+  only impl. Cleaner naming than a raw lambda. ✅ test-safe.
+- **C. Leave it.** Add a KDoc explaining why the callback exists.
+
+**Recommendation**: **B** as the smallest cleanup that makes the contract
+explicit. **A** if/when a second platform actually arrives.
+
+### R3. Use-case collapse — updated take after round 1
+
+**Files**: `shared/.../domain/usecase/*.kt` (16 files, 14 pass-throughs).
+
+**Problem (unchanged from round 1 #2)**: 14 of 16 use cases are one-line
+delegations. `UpdateThemeUseCase`, `SetAutoStartUseCase`,
+`SetBrowserExcludedUseCase`, etc. are all variations on:
 
 ```kotlin
-class UpdateThemeUseCase(private val repository: SettingsRepository) {
-    suspend operator fun invoke(theme: AppTheme) = repository.updateTheme(theme)
+class XUseCase(private val repository: SettingsRepository) {
+    suspend operator fun invoke(...) = repository.someMethod(...)
 }
 ```
 
-Pass-through use cases (no logic): `UpdateThemeUseCase`, `UpdateLanguageUseCase`,
-`SetAutoStartUseCase`, `SetBrowserExcludedUseCase`, `SetBrowserOrderUseCase`,
-`RemoveManualBrowserUseCase`, `SetRulesUseCase`, `SetShowBrowserProfilesUseCase`,
-`GetSettingsFlowUseCase`, `GetIsDefaultBrowserUseCase`,
-`OpenDefaultBrowserSettingsUseCase`, `GetCanOpenSystemSettingsUseCase`,
-`ObserveIsDefaultBrowserUseCase`, `GetAppInfoUseCase`.
+VM constructor takes 14 dependencies; AppContainer holds 16 use-case `val`s.
 
-Use cases with real logic: `AddManualBrowserUseCase` (validation, dedupe,
-self-check) and `DiscoverBrowsersUseCase` (selfBundleId filter).
+**What's changed since round 1**: Round 1 did NOT touch these. The other
+refactors (`mutateRules`, `Mutex`, etc.) made the pass-through ceremony
+*more* visible by contrast — clean code now everywhere except this one
+ceremony layer.
 
-### Why it matters
+**Variants** (same as round 1 — restating for the record):
+- **A. Keep as-is.** No change.
+- **B-soft**: freeze new pass-throughs but keep existing ones. ✅ test-safe.
+  Doesn't help current readability but stops the bleeding.
+- **B-full**: inline pass-throughs into VM. VM takes
+  `settingsRepository: SettingsRepository` directly and calls
+  `settingsRepository.setRules(...)`. Keep the two real use cases
+  (`AddManualBrowserUseCase`, `DiscoverBrowsersUseCase`). VM constructor
+  drops from 14 deps → 5; AppContainer drops 12 declarations.
+  🟠 — VM constructor signature changes; tests will not compile until
+  updated.
 
-- Every new repo method costs a use-case file + a wiring line in `AppContainer`.
-- `SettingsViewModel` constructor takes **14 dependencies**, mostly use cases.
-- `AppContainer` has 16 use-case `val`s; readers must scan past them to find anything.
-- Pass-through use cases hide nothing — the VM could call the repo directly
-  with the same effect.
-- The orthodox justification ("use cases let us swap repos") is moot: there's
-  one repo per platform and no plans to swap.
+**Recommendation**: This remains the single biggest unaddressed item. Two
+options for moving forward:
 
-### Variants
+1. **Bite the bullet on tests for this one item** — explicitly authorise B-full
+   as a one-time exception.
+2. **Stay with A** and accept the ceremony as the price of test isolation.
 
-**A. Keep the pass-throughs as-is.** No change. Accept the ceremony as the
-price of consistency.
+I genuinely think the ceremony is the worse trade — but it's the user's call.
+Round 1 documented this; round 2 doesn't have new information to flip the
+recommendation, just renewed conviction.
 
-**B. Inline the pass-throughs into `SettingsViewModel`** 🟠. The VM gets
-`settingsRepository: SettingsRepository` directly; `setAutoStart(true)`
-becomes `settingsRepository.setAutoStart(true)`. Keep the two use cases
-that have logic (`AddManualBrowserUseCase`, `DiscoverBrowsersUseCase`).
-- VM constructor shrinks from 14 deps → ~5.
-- AppContainer drops 12 declarations.
-- **Test impact:** `SettingsViewModelTest` currently injects use-case
-  instances — those constructor args change. Flagged 🟠 because user
-  said no tests touched. We'd need either: keep the use cases as thin
-  facades for tests only (defeats the point), or get explicit user
-  permission to update tests.
+### R4. `CancellationException` rethrow boilerplate (3+ sites)
 
-**C. Replace pass-throughs with a single `SettingsActions` interface**
-that VM takes; the impl just delegates to the repo. Doesn't reduce file
-count, just moves code. Worse than A and B.
+**Files**: `shared/.../ui/settings/SettingsViewModel.kt:91-99, 248-257, 270-278`,
+`shared/.../ui/picker/PickerCoordinator.kt:50-56`,
+`desktopApp/.../app/AppContainer.kt:172-178`.
 
-**D. Generate the pass-throughs.** KSP / kapt could produce them.
-Over-engineered for 14 trivial classes.
-
-### Recommendation
-
-Discuss before acting. Option **B** is the right Kotlin move per the project's
-own "no abstractions beyond what the task requires" principle. But it conflicts
-with the no-test-touch rule. Two viable paths:
-- **B-soft:** keep pass-throughs *for now* but freeze new ones — when a new
-  repo method lands, the VM calls the repo directly. Stops the bleeding,
-  doesn't disturb tests.
-- **B-full:** ask the user to relax the no-test rule for this one item; do
-  the full inline.
-
----
-
-## 3. `SettingsRepositoryImpl` encode/decode boilerplate (~70 lines)
-
-### Problem
-
-Eight methods of nearly-identical shape:
+**Problem**: Five sites repeat the same shape:
 
 ```kotlin
-private fun encodeIds(ids: Set<BrowserId>): String =
-    json.encodeToString(SetSerializer(String.serializer()), ids.map { it.value }.toSet())
-
-private fun decodeIds(raw: String?): Set<BrowserId> {
-    if (raw.isNullOrEmpty()) return emptySet()
-    return runCatching {
-        json.decodeFromString(SetSerializer(String.serializer()), raw).map(::BrowserId).toSet()
-    }.getOrDefault(emptySet())
+try {
+    block()
+} catch (t: CancellationException) {
+    throw t
+} catch (t: Throwable) {
+    handleError(t)
 }
 ```
 
-Three more pairs (`encodeOrder`/`decodeOrder`, `encodeManual`/`decodeManual`,
-`encodeRules`/`decodeRules`) follow the exact same template, differing only
-in the serializer.
+Forgetting the `CancellationException` rethrow swallows cancellation and is a
+classic Kotlin coroutines footgun.
 
-### Why it matters
+**Variants**:
+- **A. Extract `runCatchingNonCancellation { … }` extension** in a
+  small commonMain `coroutines/Cancellation.kt`. Each call site becomes:
+  ```kotlin
+  runCatchingNonCancellation { block() }.onFailure { handleError(it) }
+  ```
+  Or a `tryCancellable { ... } onFailure { ... }` style helper.
+  ✅ test-safe (helper is internal).
+- **B. Use `kotlinx.coroutines.suspendCancellableCoroutine` /
+  `runCatching`-with-rethrow**. Cleaner Kotlin style but doesn't dedupe.
 
-Adding a new `List<X>`-shaped setting today means writing two new methods,
-two `KEY_*` constants, plus the public setter and a load() line. The
-boilerplate grows linearly with persistent fields.
+**Recommendation**: **A**. Each site reads as the helper's name making the
+contract explicit, instead of three lines of ceremony.
 
-### Variants
+### R5. `PickerCoordinator` silently swallows discovery errors
 
-**A. Extract a single generic helper.**
+**Files**: `shared/.../ui/picker/PickerCoordinator.kt:50-56`.
+
+**Problem**: When `discoverBrowsers()` throws, the picker shows
+`Showing(emptyList())` with no log. The user sees an empty popup with no
+clue why; the dev sees nothing in stderr. By contrast,
+`AppContainer.kt:177` *does* log to stderr on the same kind of failure
+("Browser discovery failed: …").
+
+**Why it matters**: This is the single hottest path in the app — every
+clicked link goes through here. A silent failure is a debugging hellscape.
+
+**Variants**:
+- **A. Add a `log: (String) -> Unit = ::println` ctor parameter** (mirroring
+  RuleEngine's existing logging hook); call it from the catch with the
+  exception message. Unconditional stderr — failures are rare and worth
+  knowing about. ✅ test-safe.
+- **B. Add a separate `PickerState.LoadFailed(message)`** state so the UI
+  can render a red banner instead of an empty list. Bigger UI change.
+
+**Recommendation**: **A** now (5 minutes), revisit **B** if users actually
+hit this.
+
+### R6. Repository setter naming: `update*` vs `set*`
+
+**Files**: `shared/.../domain/repository/SettingsRepository.kt:14-22`.
+
+**Problem**: 9 setters split 2/7 between `updateX` (`updateTheme`,
+`updateLanguage`) and `setX` (every other one). Both verbs are doing the
+same thing. The split is historical, not principled.
+
+**Why it matters**: Adding a new setting today has no rule to follow. The
+inconsistency is also a small barrier to grepping for "all the places we
+mutate settings".
+
+**Variants**:
+- **A. Rename `updateTheme` → `setTheme`, `updateLanguage` → `setLanguage`**.
+  🟠 — tests call `repo.updateTheme(...)`; ~5 test files need updates.
+- **B. Rename everything to `update*`** instead. Same test impact.
+- **C. Leave it.** Document the convention going forward in CLAUDE.md.
+
+**Recommendation**: **C** unless we're already breaking the no-test rule for
+**R3**. If R3 happens, batch the rename into the same PR.
+
+### R7. `ExclusionsSection` re-implements `SectionCard` inline
+
+**Files**: `shared/.../ui/settings/sections/ExclusionsSection.kt:220-240, 241-253`.
+
+**Problem**: The "no browsers match search" empty-state Box and the wrapping
+Column for the browser list both hand-roll the rounded-bordered-padded look
+that `components/SectionCard.kt` already provides. The empty-state
+inline could be `SectionCard { Text(...) }` (six lines instead of twenty).
+The list wrapper is *almost* a SectionCard but with `padding(0)` instead of
+`padding(16)` so dividers reach the edge — that one's intentional, leave it.
+
+**Variants**:
+- **A. Replace empty-state Box with `SectionCard`.** ✅ test-safe.
+
+**Recommendation**: **A**. Trivial.
+
+### R8. `TrayHost.kt` uses fully-qualified types in `TrayHostBody` parameters
+
+**Files**: `desktopApp/.../app/tray/TrayHost.kt:62-64`.
+
+**Problem**:
 ```kotlin
-private inline fun <reified T> readJson(key: String, default: T, serializer: KSerializer<T>): T {
-    val raw = store.getStringOrNull(key) ?: return default
-    return runCatching { json.decodeFromString(serializer, raw) }.getOrDefault(default)
-}
-private fun <T> writeJson(key: String, value: T, serializer: KSerializer<T>) {
-    store.putString(key, json.encodeToString(serializer, value))
-}
+private fun ApplicationScope.TrayHostBody(
+    container: AppContainer,
+    settings: dev.hackathon.linkopener.core.model.AppSettings,
+    settingsViewModel: dev.hackathon.linkopener.ui.settings.SettingsViewModel,
+    ...
+)
 ```
-Each setter becomes a one-liner. **No test signatures change** (these are
-private helpers; tests exercise the public interface). ✅
+Same FQN smell as round-1 #12 had in `AppContainer.kt`. Inconsistent with
+the rest of the file (which has top-level imports for everything else).
 
-**B. Add a `JsonStore` wrapper class.** `JsonStore(store, json).readList(key)` /
-`writeList(key, value)`. More isolated, more typing. Same test impact.
+**Variants**:
+- **A. Add `import dev.hackathon.linkopener.core.model.AppSettings` and
+  `import dev.hackathon.linkopener.ui.settings.SettingsViewModel`**. ✅
+  test-safe.
 
-**C. Migrate to `multiplatform-settings`'s `SerializableSettings` /
-`@Serializable` typed accessor.** Bigger change; pulls in `kotlinx-serialization`
-deeper into the settings layer. Probably overkill.
+**Recommendation**: **A**. Trivial.
 
-### Recommendation
+### R9. `SingleInstanceGuard.onActivationRequest` is a `@Volatile var`
 
-**A**. Pure mechanical refactor, drops ~40 lines, leaves all tests green.
+**Files**: `desktopApp/.../app/SingleInstanceGuard.kt:43-44`,
+`desktopApp/.../app/Main.kt:14-15`.
 
----
-
-## 4. `SettingsRepositoryImpl` read-modify-write races
-
-### Problem
-
-Several setters do read-then-write on `_settings.value` without a mutex:
-
+**Problem**:
 ```kotlin
-override suspend fun setBrowserExcluded(id: BrowserId, excluded: Boolean) {
-    val current = _settings.value.excludedBrowserIds
-    val updated = if (excluded) current + id else current - id
-    if (updated == current) return
-    store.putString(KEY_EXCLUSIONS, encodeIds(updated))
-    _settings.update { it.copy(excludedBrowserIds = updated) }
-}
-```
-
-If two coroutines call `setBrowserExcluded` concurrently with different
-ids, the second can overwrite the first (the `current` snapshot stales
-before `update`).
-
-### Why it matters
-
-In practice, callbacks fire on the Main dispatcher sequentially, so
-this is **probably** safe today. But:
-- It's a footgun if anyone ever calls these from a different scope.
-- `BrowserRepositoryImpl` already has a `Mutex` for its read-then-write —
-  inconsistent with this layer.
-- `MutableStateFlow.update` is the obvious idiomatic fix — it's already
-  imported here, just used inconsistently.
-
-### Variants
-
-**A. Use `_settings.update { ... }` for all read-modify-write paths.** The
-`update` lambda is run under StateFlow's atomic CAS, so concurrent updates
-serialize. Encoding for `store.putString` happens *after* we know the new
-value — pull the encode inside the update? No, putString must run only
-once per accepted update.
-
-Sketch:
-```kotlin
-override suspend fun setBrowserExcluded(id: BrowserId, excluded: Boolean) {
-    var encoded: String? = null
-    _settings.update { current ->
-        val ids = if (excluded) current.excludedBrowserIds + id else current.excludedBrowserIds - id
-        if (ids == current.excludedBrowserIds) return@update current
-        encoded = encodeIds(ids)
-        current.copy(excludedBrowserIds = ids)
-    }
-    encoded?.let { store.putString(KEY_EXCLUSIONS, it) }
-}
-```
-
-Caveat: `update`'s lambda can re-run on contention, so encoding inside it
-would do work twice. The pattern above (capture `encoded` and write after)
-keeps store I/O outside the CAS. Tests don't observe internal sequencing,
-so they stay green. ✅
-
-**B. Add a single `Mutex` in the repo and `withLock` every setter.** Easier
-to read, slightly more contention. ✅ test-safe.
-
-**C. Leave as-is.** Document the "Main dispatcher only" assumption.
-
-### Recommendation
-
-**B** — one mutex, one lock per setter. Simpler than reasoning about CAS
-re-runs in every method.
-
----
-
-## 5. `SettingsRepository` interface is wide; test fakes are painful
-
-### Problem
-
-10 methods × 5 test fakes = 50 stub implementations. Search the test
-sources for `error("not used")` and you'll find ~20 of them. When we add
-`setShowBrowserProfiles` the existing fakes won't compile until each one
-adds the method.
-
-### Why it matters
-
-- Adding a setting today touches 5+ test files for fake updates.
-- Friction discourages adding tests that only need part of the interface.
-
-### Variants
-
-**A. Provide a `FakeSettingsRepository` base class** in `commonTest` that
-no-ops (or `error`s) every method, so tests only override what they care
-about. 🟠 Touches tests by definition (it's in `commonTest`).
-
-**B. Split `SettingsRepository` into role interfaces** (e.g. `SettingsReader`,
-`ThemePreferences`, `BrowserPreferences`, `RulePreferences`). Each VM/use-case
-declares the narrow interface it needs; the impl implements all of them.
-Test fakes get small. 🟠 Public-API change; every site that takes
-`SettingsRepository` would need its dep type narrowed (or kept wide). Tests
-declare interface types in their fakes, so they'd need updates.
-
-**C. Leave as-is.** Pay the fake-update tax with each new setting.
-
-### Recommendation
-
-**C for now** — every variant either touches tests or fragments a tightly
-related domain. Revisit if the interface keeps growing.
-
----
-
-## 6. Pass-through duplication between `SettingsScreen.kt` and `BrowserPickerScreen.kt`
-
-### Problem
-
-Both files privately define:
-- `surfaceContainerLow()` and `surfaceContainerLowest()` — **identical** bodies, wired through `LocalIsDarkMode`.
-- `BrowserIconBox` (settings, line 1322) / `IconBox` (picker, line 204) — same shape, slightly different background alpha + an added border in the picker version.
-- A "list a Browser" row composable (`BrowserRow` settings line 1008 vs picker line 173) — different actions, but same icon-box/title/subtitle layout primitive.
-
-### Why it matters
-
-If the design system tweaks the surface tones or icon-box style, we touch
-the same change twice.
-
-### Variants
-
-**A. Extract `surfaceContainerLow/Lowest` into the theme module** as
-top-level `@Composable fun`s alongside `LocalIsDarkMode`. Both screens
-import them. Pure deduplication. ✅ test-safe.
-
-**B. Also extract a shared `BrowserAvatar(initial)` composable** (the
-common icon-box). Both files use it. ✅ test-safe.
-
-**C. Extract a `BrowserRowBase` slot composable** that takes the common
-layout and a `trailing: @Composable RowScope.() -> Unit`. The settings
-row's actions and the picker row's plain click are the trailing diff.
-Larger surface; risk of over-abstraction. Skip unless we have a third
-caller.
-
-### Recommendation
-
-**A + B**. Skip C. Trivial wins, test-safe.
-
----
-
-## 7. `SettingsViewModel.onAddRule/onRemoveRule/onMoveRule/...` repetition
-
-### Problem
-
-Five rule-mutation methods all read `settings.value.rules`, validate index,
-mutate, and call `setRules(newList)`:
-
-```kotlin
-fun onUpdateRulePattern(index: Int, pattern: String) {
-    val current = settings.value.rules
-    if (index !in current.indices) return
-    if (current[index].pattern == pattern) return
-    scope.launch { setRules(current.mapIndexed { i, r -> if (i == index) r.copy(pattern = pattern) else r }) }
-}
+@Volatile
+var onActivationRequest: () -> Unit = {}
 ```
 
-### Why it matters
+It's initialized as a no-op then reassigned in `Main.kt` after the guard is
+constructed. The guard's listener thread is already running when the no-op
+default exists, so any activation pings between construction and
+reassignment go to `/dev/null`. In practice the window is microseconds, but
+it's a logical race.
 
-The pattern is fragile: every new mutation copies the index check, the
-launch, the read of `settings.value.rules`. Easy to forget guards.
+Plus: mutable public state is a smell. The contract is "set this once,
+forever".
 
-### Variants
+**Variants**:
+- **A. Take callback as a constructor parameter to `acquireOrSignal()`**.
+  Listener thread isn't started until after construction (it's started in
+  the `init` block via `Thread(::runListener).start()`); pass the callback
+  in, and start the listener only after we have it. ✅ test-safe (test fakes
+  pass a no-op or explicit handler).
+- **B. Use an `AtomicReference<() -> Unit>`** so the assignment is publicly
+  visible without `@Volatile` semantics. Same "set after construction"
+  problem, just dressed up. Don't do this.
+- **C. Leave it.** It works. The race window is sub-millisecond.
 
-**A. Inline a private helper `mutateRules(transform: (List<UrlRule>) -> List<UrlRule>?)`** —
-returns null = no-op. Each public method becomes:
+**Recommendation**: **A**. It's a tiny correctness improvement for the same
+LOC.
 
+### R10. `BrowserRepository` is request-response, not reactive
+
+**Files**: `shared/.../domain/repository/BrowserRepository.kt`,
+`shared/.../data/BrowserRepositoryImpl.kt`.
+
+**Problem**: BrowserRepository exposes `suspend fun getInstalledBrowsers():
+List<Browser>` and `suspend fun refresh()`. When `showBrowserProfiles` flips,
+nobody learns about it — `BrowserRepositoryImpl.collapseProfilesIfDisabled`
+only runs on the next `getInstalledBrowsers()` call. The VM works around this
+by manually calling `loadBrowsers(false)` after the toggle
+(`SettingsViewModel.kt:128-131`); the picker dodges it because it always asks
+on every URL.
+
+**Why it matters**: It's a "remember to invalidate" footgun. Anyone adding a
+new "settings change that affects browser shape" has to remember to also
+trigger a refresh. With a `StateFlow`, callers `collectAsState()` and
+forget about invalidation entirely.
+
+**Variants**:
+- **A. Repository exposes `StateFlow<List<Browser>>`** that internally
+  combines discovery output with `settings.flow` for the parts that
+  affect shape. Existing `getInstalledBrowsers()` becomes
+  `installed.value`. Refresh becomes a method that re-runs discovery
+  and feeds the flow.
+  🟠 — tests on `BrowserRepositoryImpl` and `AddManualBrowserUseCase`
+  read `getInstalledBrowsers()` directly; signature change cascades.
+- **B. Leave it.** Document the invalidation-on-toggle responsibility in
+  `BrowserRepository`'s KDoc so future authors don't miss it.
+
+**Recommendation**: **B for now**. The reactive shape is nicer, but the
+test impact is real and the current pattern is one-coroutine-line on the
+caller side. Revisit if a third "shape-changing setting" lands.
+
+### R11. `DiscoverBrowsersUseCase.selfBundleId` default is wrong
+
+**Files**: `shared/.../domain/usecase/DiscoverBrowsersUseCase.kt:8`.
+
+**Problem**:
 ```kotlin
-fun onUpdateRulePattern(index: Int, pattern: String) = mutateRules { current ->
-    if (index !in current.indices || current[index].pattern == pattern) null
-    else current.mapIndexed { i, r -> if (i == index) r.copy(pattern = pattern) else r }
-}
-```
-
-✅ test-safe — public signatures unchanged, only internal helpers added.
-
-**B. Move rule mutations into a `RulesEditor` class** that the VM owns.
-Bigger surface, breaks the "VM is the only state holder" pattern. Skip.
-
-### Recommendation
-
-**A**. Saves ~25 lines, cuts copy-paste.
-
----
-
-## 8. `AppContainer` is a 219-line flat wiring file
-
-### Problem
-
-`AppContainer` is a hand-rolled DI graph. Every dependency is a `val`,
-declared in one long list. After the use-case explosion (item 2) it
-holds 16 use-case declarations, 6 platform interfaces, 4 repos, 1 rule
-engine, 1 picker coordinator, 1 SharedFlow, 1 nested locale helper.
-
-### Why it matters
-
-- Large flat scope makes ordering bugs subtle (the recent fix needed
-  `systemLanguageTag` *before* `applyJvmLocale` in `init`).
-- Hard to see where a dependency is consumed.
-- VM construction reads all 14 use-case wirings in one block.
-
-### Variants
-
-**A. Group declarations with comments + blank lines.** Cheapest. Already
-half-done. Marginal gain.
-
-**B. Extract sub-graphs.** E.g. `PlatformGraph` (auto-start, discovery,
-default-browser-service, link launcher, metadata extractor),
-`DataGraph` (settings repo, browser repo, app-info repo),
-`UseCaseGraph` (all use cases). `AppContainer` becomes a composition root
-that wires the three together. 🟠 — this is invasive enough that test
-fakes injecting individual use cases might break; needs case-by-case check.
-
-**C. Adopt a real DI framework (Koin / kotlin-inject).** Out of scope for
-a refactor. Skip.
-
-**D. After item 2 (collapse use cases), AppContainer shrinks naturally**
-to ~120 lines and the problem largely goes away.
-
-### Recommendation
-
-Defer until item 2 is decided. If 2-B-full lands, do **D** (no AppContainer
-work). Otherwise revisit with **B**.
-
----
-
-## 9. `DEBUG_LOGGING` flag is duplicated
-
-### Problem
-
-`AppContainer.kt:217` defines:
-```kotlin
-val DEBUG_LOGGING: Boolean = System.getProperty("linkopener.debug") == "true"
-```
-
-`TrayHost.kt:105` checks the same string inline:
-```kotlin
-if (System.getProperty("linkopener.debug") == "true") { ... }
-```
-
-### Why it matters
-
-If we ever rename the flag or add a second source (env var fallback,
-build-time switch), we have to remember to find both sites.
-
-### Variants
-
-**A. Extract a top-level `internal val DebugFlags.enabled: Boolean`**
-in a small `app/DebugFlags.kt` file. `AppContainer` and `TrayHost` both
-read it. ✅ test-safe.
-
-**B. Pass `debugLogging: Boolean` through `AppContainer` to a new
-`debugMenu: Boolean` field that `TrayHost` reads.** More plumbing.
-
-### Recommendation
-
-**A**. ~5 minutes.
-
----
-
-## 10. `BrowserPickerScreen.kt` has a dead helper
-
-### Problem
-
-```kotlin
-@Suppress("unused")
-@Composable
-private fun surfaceContainerLowest(): androidx.compose.ui.graphics.Color = ...
-```
-
-Marked `@Suppress("unused")` — author kept it because the picker might want
-the lower-tone surface later. Today it's dead code with a suppression.
-
-### Why it matters
-
-Tiny, but `@Suppress("unused")` attracts attention on grep and signals
-"someone intended to use this and forgot." If item 6 lands (extract surface
-tones to theme module), this helper goes away on its own.
-
-### Variants
-
-**A. Delete it** (item 6 will reintroduce it as a shared symbol).
-
-**B. Leave it.**
-
-### Recommendation
-
-**A** — but as part of item 6, not standalone.
-
----
-
-## 11. `MacOsLinkLauncher` default `processFactory` is uncovered
-
-### Problem
-
-```kotlin
-class MacOsLinkLauncher(
-    private val processFactory: (List<String>) -> Process = { args ->
-        ProcessBuilder(args).inheritIO().start()
-    },
+class DiscoverBrowsersUseCase(
+    private val repository: BrowserRepository,
+    private val selfBundleId: String? = null,  // ← defaults to "don't filter"
 )
 ```
 
-The default lambda runs `ProcessBuilder.start()` and is the missing 2.4%
-of line coverage (per `CLAUDE.md` § coverage). Tests inject a fake factory
-and never exercise the default.
+Defaulting to `null` means "don't filter out our own bundle from the list".
+But that's never what production wants — AppContainer always passes the real
+bundle id, and the picker absolutely needs us filtered out (otherwise picking
+"Link Opener" loops the URL back into our handler). The default exists
+purely to keep tests terse.
 
-### Why it matters
+**Why it matters**: The default lies about the production contract. A new
+caller who reaches for this use case might omit `selfBundleId` and then
+mysteriously see the app itself in the picker.
 
-Cosmetic — coverage tool flags it. Real-world impact: zero (the lambda is
-trivial enough that visual review is sufficient).
+**Variants**:
+- **A. Make `selfBundleId` required.** 🟠 — tests pass `null` today;
+  signature change cascades.
+- **B. Move the "filter self" logic up to `BrowserRepository`** so it's
+  applied unconditionally on read. Repository ctor takes `ownBundleId`.
+  Same test cascade.
+- **C. Leave it.**
 
-### Variants
-
-**A. Leave it.** Document in the coverage exclusion list.
-
-**B. Extract the default into a top-level `defaultProcessFactory` fn** so
-it's its own "method" — same coverage gap, just relocated.
-
-**C. Add a coverage exclude rule** for this one lambda.
-
-### Recommendation
-
-**A**. Not worth chasing.
-
----
-
-## 12. Cosmetic: `dev.hackathon.linkopener.core.model.AppLanguage` referenced fully-qualified in `AppContainer.kt`
-
-### Problem
-
-`AppContainer.kt:205`:
-```kotlin
-private fun applyJvmLocale(language: dev.hackathon.linkopener.core.model.AppLanguage) {
-    val target = java.util.Locale.forLanguageTag(resolveLocaleTag(language, systemLanguageTag))
-    ...
-}
-```
-
-The same type is fully imported elsewhere. No reason for the FQN here.
-
-### Why it matters
-
-Minor noise; consistency with the rest of the file.
-
-### Variants
-
-**A. Add `import dev.hackathon.linkopener.core.model.AppLanguage` at the
-top, drop the FQN.** ✅ test-safe.
-
-### Recommendation
-
-**A**. Bundle into item 1 or item 9 cleanup.
+**Recommendation**: **C now**, **B if R10 happens** (would naturally land
+in the same refactor since BrowserRepository already changes shape).
 
 ---
 
-## 13. Layout / nesting: `SettingsScreen.kt` indentation reset on lines 161–248
+## 4. Summary table
 
-### Problem
+| ID | Item | Effort | Test impact | Recommend |
+| --- | --- | ---: | --- | --- |
+| **R1** | VM owns its `CoroutineScope` (variant A) | 30 min | ✅ | **Do** |
+| **R2** | `applyLocale` → `LocaleApplier` interface (variant B) | 30 min | ✅ | **Do** |
+| **R3** | Use-case collapse (B-full) | 1–2 h | 🟠 | **User call** |
+| **R4** | `runCatchingNonCancellation` helper | 20 min | ✅ | **Do** |
+| **R5** | `PickerCoordinator` log on error | 10 min | ✅ | **Do** |
+| **R6** | `set*` vs `update*` rename | 30 min | 🟠 | Bundle into R3 if it happens |
+| **R7** | `ExclusionsSection` empty-state → `SectionCard` | 10 min | ✅ | **Do** |
+| **R8** | `TrayHost.kt` FQN cleanup | 5 min | ✅ | **Do** |
+| **R9** | `SingleInstanceGuard` callback as ctor param | 20 min | ✅ | **Do** |
+| **R10** | Reactive `BrowserRepository` (variant A) | 2 h | 🟠 | Defer |
+| **R11** | `DiscoverBrowsersUseCase.selfBundleId` required | 15 min | 🟠 | Defer |
 
-```kotlin
-CompositionLocalProvider(LocalAppLocale provides settings.language.name) {
-Box(modifier = Modifier.fillMaxSize()) {        // ← column 4
-Surface(...) { ... }                             // ← column 4
-}
-}
-```
-
-The `Box` and `Surface` keep their original indentation when the author
-wrapped them in `CompositionLocalProvider` later. Doesn't break anything;
-it's just visually misleading.
-
-### Why it matters
-
-Visual signal of an out-of-band wrap. Future readers spend a few seconds
-re-checking the brace structure to confirm it's not broken.
-
-### Variants
-
-**A. Re-indent.** ✅ test-safe.
-
-### Recommendation
-
-**A**. Bundle with item 1 (the file gets carved up anyway).
+Plus old: **#5** (interface split, defer), **#8** (AppContainer subgraphs,
+gated on R3).
 
 ---
 
-## 14. `LocalAppLocale.current` is a discipline checkpoint
+## 5. Suggested execution order
 
-### Problem
+If approved, do the test-safe items together as a single sweep (similar to
+round 1's bundling). The 🟠 items are decision-gated and stand alone.
 
-The `LocalAppLocale` nonce is read at the top of TopAppBar, NotDefaultBanner,
-Sidebar, and three other composables in the settings tree to force them out
-of Compose smart-skipping when the locale changes.
+**Sweep 2A — test-safe (~2 h, one PR / squashed commit):**
+1. R8 (FQN cleanup — sets the tone)
+2. R7 (empty-state → SectionCard)
+3. R4 (cancellation helper)
+4. R5 (picker error log)
+5. R9 (SingleInstanceGuard ctor callback)
+6. R1 (VM owns scope)
+7. R2 (LocaleApplier interface)
 
-The doc on `LocalAppLocale` warns that *every* string-using composable that
-takes no settings-derived parameter must call `LocalAppLocale.current` or
-its strings won't update. Easy to forget when adding a new section.
+**Decision-gated:**
+- **R3** — needs explicit OK on test changes. Biggest single architectural
+  win in the codebase.
+- **R6**, **R10**, **R11** — defer or bundle into R3.
 
-### Why it matters
-
-A subtle correctness footgun on every new composable. The bug surface from
-forgetting it is "language switch leaves my new section in English".
-
-### Variants
-
-**A. Wrap the call in a tiny helper:** `@Composable fun useLocaleNonce() { LocalAppLocale.current }`.
-Doesn't change behavior; just gives the read a discoverable name.
-
-**B. Switch to a `@Stable LocaleHolder` class** that wraps the tag and is
-provided as a value class. Reading any of its members invalidates dependents.
-More elaborate; same outcome.
-
-**C. Document the rule loudly** in `CLAUDE.md` and call it good. Easy
-escape hatch if items 1 / 6 land — every new file moved out of
-`SettingsScreen.kt` has a comment header reminding the author.
-
-### Recommendation
-
-**A** + **C**. The helper is pure naming; the doc is the real safety net.
-
----
-
-## 15. `MacOsBrowserDiscovery.discover()` does five things in one method
-
-### Problem
-
-```kotlin
-override suspend fun discover(): List<Browser> = withContext(Dispatchers.IO) {
-    val candidates = ...   // (a) scan + canonicalize
-    val parents = ...      // (b) parallel-read plists
-    parents.flatMap { ... }.sortedBy { ... }   // (c) family detect, (d) profile expand, (e) sort
-}
-```
-
-It works, but each step is a candidate for its own private helper for
-readability — especially `expandWithProfiles`, which is already a helper
-but the others aren't.
-
-### Why it matters
-
-`discover()` is the single most-tested method on macOS (smoke tests + unit
-tests). Each new platform-specific behavior (e.g. "skip browsers in
-`/Volumes`") would touch this body.
-
-### Variants
-
-**A. Extract `findCandidatePaths()`, `readBrowsersInParallel()`** as
-private helpers; keep `expandWithProfiles` and `resolveSafely`. `discover()`
-becomes a 4-line summary. ✅ test-safe (private helpers).
-
-**B. Leave it.** The function fits on one screen; readers can follow it.
-
-### Recommendation
-
-**A** if item 1 is happening anyway (we'd be in refactor mode). Otherwise
-**B**.
-
----
-
-## 16. Comment-vs-code maintenance: `// region` ... `// endregion` pairs
-
-`SettingsScreen.kt` has 8 region pairs that the IDE folds. They're
-load-bearing for the current 1,445-line file but **become noise** the
-moment item 1 lands. After the split each region is its own file.
-
-**Action:** drop region markers as part of the per-file split.
-
----
-
-## 17. Other minor / observational notes (no action proposed)
-
-- **`SingleInstanceGuard.kt` (190 lines)** — JVM-y file with `ServerSocket`
-  + thread; not Compose territory; reads cleanly. No refactor pending.
-- **`MacOsAlwaysOnTopOverFullScreen.kt` (157 lines)** — JNA bridge into
-  AppKit. Self-contained, well-commented. Don't touch.
-- **`AppIcons.kt` (207 lines)** — hand-rolled vectors. Splitting per-icon
-  files would be churn for no readability win.
-- **`LinkOpenerColors.kt` (144 lines)** — design tokens; size is data, not
-  logic.
-- **`TrayHost.kt` (185 lines)** — borderline, but the single composable
-  + two helpers structure is clear; not splitting.
-
----
-
-## 18. Suggested execution order
-
-If approved, recommended order to keep PRs small and reviewable:
-
-| Step | Item                                                          | Effort | Test impact   |
-| ---: | ------------------------------------------------------------- | -----: | ------------- |
-|    1 | **Item 9** — extract `DebugFlags`                             | 5 min  | none          |
-|    2 | **Item 6** — share `surfaceContainer*` + `BrowserAvatar`      | 30 min | none          |
-|    3 | **Item 3** — generic JSON helpers in `SettingsRepositoryImpl` | 30 min | none          |
-|    4 | **Item 4** — single `Mutex` for repo writes                   | 20 min | none          |
-|    5 | **Item 7** — `mutateRules` helper in VM                       | 20 min | none          |
-|    6 | **Item 1** — split `SettingsScreen.kt` per region (+ items 12, 13, 14, 16) | 1–2 h | none |
-|    7 | **Item 15** — extract macOS discovery helpers                 | 30 min | none          |
-|    8 | **Item 2** — discuss with user: B-soft vs B-full              | TBD    | depends on choice |
-|    9 | **Item 8** — revisit AppContainer after #2 lands              | TBD    | depends       |
-
-Items 1–7 are all individually test-safe and individually small. Each
-should be a separate commit (per `CLAUDE.md` workflow), all on this
-`refactoring` branch. The last two are gated on user input.
-
----
-
-## 19. Out of scope (not refactoring)
-
-- Replacing the placeholder `Refresh` icon (TODO comment in `AppIcons.kt`).
-- Sonoma+ Default-browser settings deep-link TODO in `MacOsDefaultBrowserService`.
-- Stage 7 / Stage 8 (Windows / Linux) — feature work, not refactor.
-- Mailto / non-http URL scheme support — feature.
-- TD-1, TD-4, TD-6, TD-8 from `TECHDEBT.md` — separate followups.
-
----
-
-## 20. Acceptance criteria for this refactoring
-
-A future "refactoring done" PR is acceptable when:
-
+**Acceptance criteria** (same as round 1):
 - [ ] `./gradlew build` is green.
-- [ ] `./gradlew :shared:koverHtmlReport` shows no regression in line / branch coverage.
-- [ ] No test file is modified (per the user's hard constraint).
-- [ ] No production behavior change observable from the Settings UI, the
-      picker, or the launcher.
-- [ ] `SettingsScreen.kt` is < 200 lines.
-- [ ] `SettingsRepositoryImpl.kt` is < 100 lines (after item 3).
-- [ ] All new files follow the existing package layout (`ui.settings.sections`,
-      `ui.settings.components`, `ui.theme.surface`).
+- [ ] `:shared:koverHtmlReport` shows no regression.
+- [ ] No test file is modified for sweep 2A.
+- [ ] No production behaviour change observable from the UI.
+- [ ] Each commit (within the squash) has a one-line subject and a body
+      explaining the *why*.

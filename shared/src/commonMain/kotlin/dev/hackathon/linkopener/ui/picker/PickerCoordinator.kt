@@ -2,13 +2,13 @@ package dev.hackathon.linkopener.ui.picker
 
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.toBrowserId
+import dev.hackathon.linkopener.coroutines.runCatchingNonCancellation
 import dev.hackathon.linkopener.domain.RuleDecision
 import dev.hackathon.linkopener.domain.RuleEngine
 import dev.hackathon.linkopener.domain.applyUserOrder
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.platform.LinkLauncher
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,13 +21,20 @@ class PickerCoordinator(
     private val launcher: LinkLauncher,
     private val ruleEngine: RuleEngine,
     private val scope: CoroutineScope,
+    // Failures here are rare but always interesting — the picker is the app's
+    // hottest path. Default to stderr so they show up in Console.app even
+    // outside debug mode (mirrors what AppContainer does for startup
+    // discovery). Tests pass a no-op or a recorder.
+    private val logError: (String, Throwable) -> Unit = { tag, t ->
+        System.err.println("[$tag] ${t.message}")
+    },
 ) {
     private val _state = MutableStateFlow<PickerState>(PickerState.Hidden)
     val state: StateFlow<PickerState> = _state.asStateFlow()
 
     fun handleIncomingUrl(url: String) {
         scope.launch {
-            try {
+            runCatchingNonCancellation {
                 val all = discoverBrowsers()
                 val settings = getSettings().value
                 // Rule engine sees the full discovered list and the
@@ -42,16 +49,17 @@ class PickerCoordinator(
                 )
                 if (decision is RuleDecision.Direct) {
                     launcher.openIn(decision.browser, url)
-                    return@launch
+                    return@runCatchingNonCancellation
                 }
                 val available = all.filterNot { it.toBrowserId() in settings.excludedBrowserIds }
                 val ordered = applyUserOrder(available, settings.browserOrder)
                 _state.value = PickerState.Showing(url = url, browsers = ordered)
-            } catch (t: CancellationException) {
-                throw t
-            } catch (t: Throwable) {
+            }.onFailure {
                 // If discovery blew up, show an empty picker rather than swallowing
                 // the URL silently — the empty UI directs the user to Settings.
+                // Also log so a dev sees why; without this the failure is
+                // invisible outside breakpoints.
+                logError("picker", it)
                 _state.value = PickerState.Showing(url = url, browsers = emptyList())
             }
         }

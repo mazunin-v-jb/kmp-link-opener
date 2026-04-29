@@ -16,13 +16,13 @@ import dev.hackathon.linkopener.domain.usecase.SetAutoStartUseCase
 import dev.hackathon.linkopener.domain.usecase.AddManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.RemoveManualBrowserUseCase
 import dev.hackathon.linkopener.core.model.UrlRule
+import dev.hackathon.linkopener.coroutines.runCatchingNonCancellation
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
 import dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -88,14 +88,10 @@ class SettingsViewModel(
         // discovery cost. Manual refresh() (button / retry) forces re-scan.
         loadBrowsers(forceRefresh = false)
         scope.launch {
-            try {
-                _isDefaultBrowser.value = getIsDefaultBrowser()
-            } catch (t: CancellationException) {
-                throw t
-            } catch (_: Throwable) {
-                // Initial read failure: leave default false; the observer
-                // flow will populate later if/when it emits.
-            }
+            // Initial read failure: leave default false; the observer flow
+            // will populate later if/when it emits.
+            runCatchingNonCancellation { getIsDefaultBrowser() }
+                .onSuccess { _isDefaultBrowser.value = it }
         }
     }
 
@@ -245,16 +241,11 @@ class SettingsViewModel(
     private fun loadBrowsers(forceRefresh: Boolean) {
         scope.launch {
             _browsers.value = BrowsersState.Loading
-            try {
-                val raw = discoverBrowsers(forceRefresh = forceRefresh)
-                _browsers.value = BrowsersState.Loaded(
-                    applyUserOrder(raw, settings.value.browserOrder),
+            _browsers.value = runCatchingNonCancellation {
+                BrowsersState.Loaded(
+                    applyUserOrder(discoverBrowsers(forceRefresh = forceRefresh), settings.value.browserOrder),
                 )
-            } catch (t: CancellationException) {
-                throw t
-            } catch (t: Throwable) {
-                _browsers.value = BrowsersState.Error(t.message ?: "Browser discovery failed")
-            }
+            }.getOrElse { BrowsersState.Error(it.message ?: "Browser discovery failed") }
         }
     }
 
@@ -267,15 +258,11 @@ class SettingsViewModel(
     fun refresh() {
         refreshBrowsers()
         scope.launch {
-            try {
-                _isDefaultBrowser.value = getIsDefaultBrowser()
-            } catch (t: CancellationException) {
-                throw t
-            } catch (_: Throwable) {
-                // Keep the previous value on read failure rather than flipping
-                // to false — a transient read error shouldn't visually claim
-                // we're no longer the default.
-            }
+            // Keep the previous value on read failure rather than flipping to
+            // false — a transient read error shouldn't visually claim we're
+            // no longer the default.
+            runCatchingNonCancellation { getIsDefaultBrowser() }
+                .onSuccess { _isDefaultBrowser.value = it }
         }
     }
 

@@ -15,8 +15,10 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
 import dev.hackathon.linkopener.app.DebugFlags
+import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
+import dev.hackathon.linkopener.ui.settings.SettingsViewModel
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
 import java.awt.FileDialog
 import java.awt.Frame
@@ -60,8 +62,8 @@ fun ApplicationScope.TrayHost(
 @Composable
 private fun ApplicationScope.TrayHostBody(
     container: AppContainer,
-    settings: dev.hackathon.linkopener.core.model.AppSettings,
-    settingsViewModel: dev.hackathon.linkopener.ui.settings.SettingsViewModel,
+    settings: AppSettings,
+    settingsViewModel: SettingsViewModel,
     appVersion: String,
     onExit: () -> Unit,
 ) {

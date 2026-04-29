@@ -218,20 +218,7 @@ private fun BrowserList(
         }
         Spacer(Modifier.height(12.dp))
         if (visible.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = surfaceContainerLowest(),
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                    .padding(16.dp),
-            ) {
+            SectionCard {
                 Text(
                     text = stringResource(Res.string.browsers_empty),
                     style = MaterialTheme.typography.bodyLarge,

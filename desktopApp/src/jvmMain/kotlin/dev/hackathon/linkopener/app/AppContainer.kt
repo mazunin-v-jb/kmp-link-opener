@@ -2,6 +2,7 @@ package dev.hackathon.linkopener.app
 
 import com.russhwolf.settings.Settings
 import dev.hackathon.linkopener.core.model.AppLanguage
+import dev.hackathon.linkopener.coroutines.runCatchingNonCancellation
 import dev.hackathon.linkopener.data.AppInfoRepositoryImpl
 import dev.hackathon.linkopener.data.BrowserRepositoryImpl
 import dev.hackathon.linkopener.data.SettingsRepositoryImpl
@@ -35,7 +36,6 @@ import dev.hackathon.linkopener.platform.PlatformFactory
 import dev.hackathon.linkopener.platform.UrlReceiver
 import dev.hackathon.linkopener.ui.picker.PickerCoordinator
 import dev.hackathon.linkopener.ui.settings.SettingsViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -157,25 +157,24 @@ class AppContainer {
         // result is cached inside BrowserRepositoryImpl, so subsequent
         // discoverBrowsersUseCase() calls hit memory.
         coroutineScope.launch {
-            try {
-                val browsers = discoverBrowsersUseCase()
-                if (DebugFlags.enabled) {
-                    println("Discovered ${browsers.size} browser(s):")
-                    browsers.forEach { browser ->
-                        val version = browser.version ?: "(no version)"
-                        println(
-                            "  - ${browser.displayName} $version " +
-                                "(${browser.bundleId}) at ${browser.applicationPath}",
-                        )
+            runCatchingNonCancellation { discoverBrowsersUseCase() }
+                .onSuccess { browsers ->
+                    if (DebugFlags.enabled) {
+                        println("Discovered ${browsers.size} browser(s):")
+                        browsers.forEach { browser ->
+                            val version = browser.version ?: "(no version)"
+                            println(
+                                "  - ${browser.displayName} $version " +
+                                    "(${browser.bundleId}) at ${browser.applicationPath}",
+                            )
+                        }
                     }
                 }
-            } catch (t: CancellationException) {
-                throw t
-            } catch (t: Throwable) {
-                // Errors always surface — they indicate a real problem we want
-                // to see in Console.app even outside debug mode.
-                System.err.println("[ERROR] Browser discovery failed: ${t.message}")
-            }
+                .onFailure {
+                    // Errors always surface — they indicate a real problem we
+                    // want to see in Console.app even outside debug mode.
+                    System.err.println("[ERROR] Browser discovery failed: ${it.message}")
+                }
         }
     }
 
