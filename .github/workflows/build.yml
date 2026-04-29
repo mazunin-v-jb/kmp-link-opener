@@ -76,8 +76,13 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Package MSI
-        run: ./gradlew :desktopApp:packageMsi
+      - name: Package MSI (with HKLM patch)
+        # patchMsiHklm depends on packageMsi and post-processes the MSI to
+        # add HKLM browser-registration entries via patch-msi-hklm.ps1 so
+        # the installer registers Link Opener as a candidate browser
+        # machine-wide (not just per-user). PowerShell ships with
+        # windows-latest runners.
+        run: ./gradlew :desktopApp:patchMsiHklm
       - uses: actions/upload-artifact@v4
         with:
           name: linkopener-windows-msi

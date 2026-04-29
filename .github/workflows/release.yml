@@ -78,7 +78,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :desktopApp:packageMsi
+      # patchMsiHklm depends on packageMsi and post-processes the MSI
+      # to add HKLM browser-registration entries via patch-msi-hklm.ps1.
+      - run: ./gradlew :desktopApp:patchMsiHklm
       - uses: actions/upload-artifact@v4
         with:
           name: windows-msi
