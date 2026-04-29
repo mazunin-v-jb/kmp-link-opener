@@ -36,6 +36,7 @@ import dev.hackathon.linkopener.platform.DefaultBrowserService
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.platform.LinkLauncher
 import dev.hackathon.linkopener.platform.PlatformFactory
+import dev.hackathon.linkopener.platform.RunningBrowserProbe
 import dev.hackathon.linkopener.platform.UrlReceiver
 import dev.hackathon.linkopener.platform.windows.WindowsBrowserDiscovery
 import dev.hackathon.linkopener.ui.picker.PickerCoordinator
@@ -82,6 +83,7 @@ class AppContainer {
     private val browserMetadataExtractor: BrowserMetadataExtractor =
         PlatformFactory.createBrowserMetadataExtractor()
     private val browserIconLoader: BrowserIconLoader = PlatformFactory.createBrowserIconLoader()
+    private val runningBrowserProbe: RunningBrowserProbe = PlatformFactory.createRunningBrowserProbe()
 
     private val appInfoRepository: AppInfoRepository = AppInfoRepositoryImpl()
     private val settingsRepository: SettingsRepository = SettingsRepositoryImpl(
@@ -145,6 +147,7 @@ class AppContainer {
         launcher = linkLauncher,
         ruleEngine = ruleEngine,
         iconRepository = browserIconRepository,
+        runningBrowserProbe = runningBrowserProbe,
         scope = coroutineScope,
     )
 

@@ -3,6 +3,7 @@ package dev.hackathon.linkopener.ui.picker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,12 +33,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.hackathon.linkopener.core.model.Browser
+import dev.hackathon.linkopener.core.model.BrowserId
+import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.core.model.uiLabel
 import dev.hackathon.linkopener.ui.theme.BrowserAvatar
 import dev.hackathon.linkopener.ui.theme.surfaceContainerLow
+import dev.hackathon.linkopener.ui.util.PlatformTooltip
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.picker_empty
 import kmp_link_opener.shared.generated.resources.picker_empty_hint
@@ -65,9 +70,17 @@ fun BrowserPickerScreen(
     // Keyed by Browser.applicationPath. Missing key → row falls back to the
     // letter avatar, matching the look before "browser-icons" landed.
     icons: Map<String, ImageBitmap> = emptyMap(),
+    // Subset of [browsers] whose process is currently running; non-members
+    // get rendered with reduced alpha so the running set is obvious at a
+    // glance. Empty set → "no info" mode (e.g. on Android, where probing
+    // isn't supported), all rows stay at full opacity.
+    runningBrowserIds: Set<BrowserId> = emptySet(),
     headerWrapper: @Composable (content: @Composable () -> Unit) -> Unit = { it() },
 ) {
     var expanded by remember(browsers) { mutableStateOf(false) }
+    // "no info" → don't fade anything, otherwise we'd ash-out the entire
+    // list when the host doesn't expose process state.
+    val noRunningInfo = runningBrowserIds.isEmpty()
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -91,6 +104,8 @@ fun BrowserPickerScreen(
                 ScrollableBrowserList(
                     browsers = browsers,
                     icons = icons,
+                    runningBrowserIds = runningBrowserIds,
+                    noRunningInfo = noRunningInfo,
                     onPick = onPick,
                 )
             } else {
@@ -98,6 +113,7 @@ fun BrowserPickerScreen(
                     BrowserRow(
                         browser = browser,
                         icon = icons[browser.applicationPath],
+                        isRunning = noRunningInfo || browser.toBrowserId() in runningBrowserIds,
                         onClick = { onPick(browser) },
                     )
                 }
@@ -119,6 +135,8 @@ fun BrowserPickerScreen(
 private fun ScrollableBrowserList(
     browsers: List<Browser>,
     icons: Map<String, ImageBitmap>,
+    runningBrowserIds: Set<BrowserId>,
+    noRunningInfo: Boolean,
     onPick: (Browser) -> Unit,
 ) {
     val scrollState = rememberScrollState()
@@ -132,6 +150,7 @@ private fun ScrollableBrowserList(
                 BrowserRow(
                     browser = browser,
                     icon = icons[browser.applicationPath],
+                    isRunning = noRunningInfo || browser.toBrowserId() in runningBrowserIds,
                     onClick = { onPick(browser) },
                 )
             }
@@ -161,15 +180,22 @@ private fun Header(url: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(2.dp))
-        Text(
-            text = url,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-        )
+        // Cap the URL block at 3 lines so a giant URL can't blow up the
+        // popup vertically; ellipsize anything longer. The full URL is
+        // always reachable through the hover tooltip — cheap on desktop
+        // (CMP TooltipArea), no-op on Android (no hover surface).
+        PlatformTooltip(text = url) {
+            Text(
+                text = url,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
     Box(
         modifier = Modifier
@@ -183,12 +209,18 @@ private fun Header(url: String) {
 private fun BrowserRow(
     browser: Browser,
     icon: ImageBitmap?,
+    isRunning: Boolean,
     onClick: () -> Unit,
 ) {
+    // Stopped browsers fade to 45% — clearly demoted but still legible.
+    // Modifier.alpha is graphics-layer only, so the click target stays the
+    // full row regardless of opacity.
+    val rowAlpha = if (isRunning) 1f else 0.45f
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .alpha(rowAlpha)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

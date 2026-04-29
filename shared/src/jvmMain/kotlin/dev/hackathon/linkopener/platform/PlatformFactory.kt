@@ -63,6 +63,15 @@ object PlatformFactory {
         HostOs.Other -> UnsupportedManualBrowserExtractor(System.getProperty("os.name").orEmpty())
     }
 
+    fun createRunningBrowserProbe(): RunningBrowserProbe = when (currentOs) {
+        // Real probe via `ps` / PowerShell on supported desktop hosts. On
+        // Android/Other hosts the JvmRunningBrowserProbe internally returns
+        // an empty list anyway, but skipping straight to the no-op spares
+        // the ProcessBuilder allocation.
+        HostOs.MacOs, HostOs.Linux, HostOs.Windows -> JvmRunningBrowserProbe(currentOs)
+        HostOs.Android, HostOs.Other -> NoOpRunningBrowserProbe()
+    }
+
     fun createBrowserIconLoader(): BrowserIconLoader = when (currentOs) {
         // macOS treats `.app` bundles as opaque packages on disk, so
         // `FileSystemView.getSystemIcon` would return the generic Finder

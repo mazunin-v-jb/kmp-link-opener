@@ -125,6 +125,7 @@ private fun ApplicationScope.TrayHostBody(
                 url = currentPickerState.url,
                 browsers = currentPickerState.browsers,
                 icons = browserIcons,
+                runningBrowserIds = currentPickerState.runningBrowserIds,
                 onPick = container.pickerCoordinator::pickBrowser,
                 onDismiss = container.pickerCoordinator::dismiss,
             )

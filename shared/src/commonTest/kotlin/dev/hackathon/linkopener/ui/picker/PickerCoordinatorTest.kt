@@ -11,6 +11,8 @@ import dev.hackathon.linkopener.domain.repository.SettingsRepository
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.platform.LinkLauncher
+import dev.hackathon.linkopener.platform.NoOpRunningBrowserProbe
+import dev.hackathon.linkopener.platform.RunningBrowserProbe
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -247,6 +249,43 @@ class PickerCoordinatorTest {
     }
 
     @Test
+    fun runningBrowserIdsFromProbeAreCarriedIntoShowingState() = runTest {
+        val probe = StaticRunningBrowserProbe(setOf(safari.toBrowserId()))
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, chrome),
+            runningBrowserProbe = probe,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        val state = coord.state.value
+        assertIs<PickerState.Showing>(state)
+        assertEquals(setOf(safari.toBrowserId()), state.runningBrowserIds)
+    }
+
+    @Test
+    fun probeFailureFallsBackToEmptyRunningSetWithoutKillingPicker() = runTest {
+        // The probe is best-effort UX polish; an exception inside it must
+        // not prevent the popup from rendering. Empty set lets the UI
+        // gracefully degrade to "all rows fully opaque".
+        val probe = ThrowingRunningBrowserProbe()
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, chrome),
+            runningBrowserProbe = probe,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        val state = coord.state.value
+        assertIs<PickerState.Showing>(state)
+        assertEquals(emptySet(), state.runningBrowserIds)
+    }
+
+    @Test
     fun emptyBrowserListStillShowsPickerWithEmptyState() = runTest {
         val coord = newCoordinator(scope = this, browsers = emptyList())
 
@@ -413,11 +452,13 @@ class PickerCoordinatorTest {
         settings: AppSettings = AppSettings.Default,
         launcher: LinkLauncher = RecordingLauncher(),
         ruleEngine: RuleEngine = RuleEngine(),
+        runningBrowserProbe: RunningBrowserProbe = NoOpRunningBrowserProbe(),
     ): PickerCoordinator = PickerCoordinator(
         discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(browsers)),
         getSettings = GetSettingsFlowUseCase(InMemorySettingsRepository(settings)),
         launcher = launcher,
         ruleEngine = ruleEngine,
+        runningBrowserProbe = runningBrowserProbe,
         scope = scope,
     )
 
@@ -484,5 +525,15 @@ class PickerCoordinatorTest {
             calls += browser to url
             return true
         }
+    }
+
+    private class StaticRunningBrowserProbe(
+        private val running: Set<dev.hackathon.linkopener.core.model.BrowserId>,
+    ) : RunningBrowserProbe {
+        override suspend fun runningOf(installed: List<Browser>) = running
+    }
+
+    private class ThrowingRunningBrowserProbe : RunningBrowserProbe {
+        override suspend fun runningOf(installed: List<Browser>) = error("probe failed")
     }
 }

@@ -10,6 +10,8 @@ import dev.hackathon.linkopener.domain.applyUserOrder
 import dev.hackathon.linkopener.domain.usecase.DiscoverBrowsersUseCase
 import dev.hackathon.linkopener.domain.usecase.GetSettingsFlowUseCase
 import dev.hackathon.linkopener.platform.LinkLauncher
+import dev.hackathon.linkopener.platform.NoOpRunningBrowserProbe
+import dev.hackathon.linkopener.platform.RunningBrowserProbe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +26,10 @@ class PickerCoordinator(
     // Optional so tests that don't care about icons can pass `null`. In
     // production the icon repo is always wired through AppContainer.
     private val iconRepository: BrowserIconRepository? = null,
+    // Default no-op so AndroidAppContainer (and tests that don't care about
+    // running-state) get the "no tint" rendering for free. AppContainer on
+    // desktop wires the JvmRunningBrowserProbe via PlatformFactory.
+    private val runningBrowserProbe: RunningBrowserProbe = NoOpRunningBrowserProbe(),
     private val scope: CoroutineScope,
     // Failures here are rare but always interesting — the picker is the app's
     // hottest path. Default to stderr so they show up in Console.app even
@@ -66,11 +72,22 @@ class PickerCoordinator(
                     launcher.openIn(ordered.single(), url)
                     return@runCatchingNonCancellation
                 }
+                // Probe is best-effort — a hang or non-zero exit from the
+                // underlying `ps`/PowerShell call surfaces as an empty set,
+                // which the UI treats as "no info, render fully opaque".
+                // Don't let it tank the picker.
+                val runningIds = runCatchingNonCancellation {
+                    runningBrowserProbe.runningOf(ordered)
+                }.getOrElse { emptySet() }
                 // Idempotent — repo skips paths that have already been
                 // attempted, so the cost is a no-op once warmed up by
                 // AppContainer's startup discovery dump.
                 iconRepository?.prefetch(scope, ordered.map { it.applicationPath })
-                _state.value = PickerState.Showing(url = url, browsers = ordered)
+                _state.value = PickerState.Showing(
+                    url = url,
+                    browsers = ordered,
+                    runningBrowserIds = runningIds,
+                )
             }.onFailure {
                 // If discovery blew up, show an empty picker rather than swallowing
                 // the URL silently — the empty UI directs the user to Settings.

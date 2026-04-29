@@ -162,6 +162,97 @@ class MacOsLinkLauncherTest {
     }
 
     @Test
+    fun firefoxFamilyInvokesBinaryDirectlyToBypassColdStartUrlDrop() = runTest {
+        // Mozilla bug 531552 / 1987335: `open -a Firefox URL` cold-starts
+        // Firefox but loses the URL in a startup race. Direct binary
+        // invocation routes through Mozilla's own remoting and works in
+        // both cold and warm states.
+        val captured = mutableListOf<List<String>>()
+        val launcher = MacOsLinkLauncher(
+            processFactory = { args ->
+                captured.add(args)
+                FakeProcess(exitCode = 0)
+            },
+            bundleExecutableNameReader = { bundlePath ->
+                assertEquals("/Applications/Firefox.app", bundlePath)
+                "firefox"
+            },
+        )
+        val firefox = dev.hackathon.linkopener.core.model.Browser(
+            bundleId = "org.mozilla.firefox",
+            displayName = "Firefox",
+            applicationPath = "/Applications/Firefox.app",
+            version = "131.0",
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Firefox,
+        )
+
+        launcher.openIn(firefox, "https://example.com/?q=1")
+
+        assertEquals(
+            listOf("/Applications/Firefox.app/Contents/MacOS/firefox", "https://example.com/?q=1"),
+            captured.single(),
+        )
+    }
+
+    @Test
+    fun firefoxForkUsesItsOwnCFBundleExecutable() = runTest {
+        // Tor / Waterfox / LibreWolf / Mullvad all bundle Gecko under their
+        // own CFBundleExecutable. Reading the field instead of hardcoding
+        // "firefox" makes the same code path work for them.
+        val captured = mutableListOf<List<String>>()
+        val launcher = MacOsLinkLauncher(
+            processFactory = { args ->
+                captured.add(args)
+                FakeProcess(exitCode = 0)
+            },
+            bundleExecutableNameReader = { "librewolf" },
+        )
+        val librewolf = dev.hackathon.linkopener.core.model.Browser(
+            bundleId = "io.gitlab.librewolf-community",
+            displayName = "LibreWolf",
+            applicationPath = "/Applications/LibreWolf.app",
+            version = "131.0",
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Firefox,
+        )
+
+        launcher.openIn(librewolf, "https://example.com")
+
+        assertEquals(
+            listOf("/Applications/LibreWolf.app/Contents/MacOS/librewolf", "https://example.com"),
+            captured.single(),
+        )
+    }
+
+    @Test
+    fun firefoxFallsBackToOpenAWhenCFBundleExecutableUnreadable() = runTest {
+        // If plutil fails for any reason, we lose the cold-start guarantee
+        // but warm-state Apple Events still route the URL correctly via
+        // `open -a`. Strictly better than refusing to launch at all.
+        val captured = mutableListOf<List<String>>()
+        val launcher = MacOsLinkLauncher(
+            processFactory = { args ->
+                captured.add(args)
+                FakeProcess(exitCode = 0)
+            },
+            bundleExecutableNameReader = { null },
+        )
+        val firefox = dev.hackathon.linkopener.core.model.Browser(
+            bundleId = "org.mozilla.firefox",
+            displayName = "Firefox",
+            applicationPath = "/Applications/Firefox.app",
+            version = "131.0",
+            family = dev.hackathon.linkopener.core.model.BrowserFamily.Firefox,
+        )
+
+        launcher.openIn(firefox, "https://example.com")
+
+        assertEquals(
+            listOf("open", "-a", "/Applications/Firefox.app", "--", "https://example.com"),
+            captured.single(),
+        )
+    }
+
+    @Test
     fun urlSpecialCharactersArePassedThroughVerbatim() = runTest {
         val captured = mutableListOf<List<String>>()
         val launcher = MacOsLinkLauncher(processFactory = { args ->

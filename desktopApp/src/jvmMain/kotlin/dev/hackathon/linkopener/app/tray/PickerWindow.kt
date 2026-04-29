@@ -19,6 +19,7 @@ import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.core.model.Browser
+import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.ui.picker.BrowserPickerScreen
 import java.awt.MouseInfo
 import kotlinx.coroutines.flow.drop
@@ -29,6 +30,7 @@ fun ApplicationScope.PickerWindow(
     url: String,
     browsers: List<Browser>,
     icons: Map<String, ImageBitmap>,
+    runningBrowserIds: Set<BrowserId>,
     onPick: (Browser) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -82,6 +84,7 @@ fun ApplicationScope.PickerWindow(
                 windowState.size = DpSize(PICKER_WIDTH, PICKER_HEIGHT_EXPANDED)
             },
             icons = icons,
+            runningBrowserIds = runningBrowserIds,
             // Header doubles as a drag handle so users can reposition the
             // popup without a title bar (we run undecorated). WindowDraggableArea
             // is a WindowScope extension, so resolution depends on this lambda
