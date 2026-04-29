@@ -292,7 +292,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun onMoveBrowserDownSwapsWithNeighbour() = runTest {
+    fun onReorderBrowsersMovesItemAndPersistsOrder() = runTest {
         val repo = FakeSettingsRepository()
         val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
         val chrome = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome.app", null)
@@ -304,21 +304,28 @@ class SettingsViewModelTest {
         )
         testScheduler.advanceUntilIdle()
 
-        vm.onMoveBrowserDown(BrowserId("/Applications/Safari.app"))
+        // Drag Safari (index 0) past Chrome to land at index 2 — Firefox
+        // shifts up to 1, Chrome to 0, Safari to 2. This is the canonical
+        // "drag past one neighbor" gesture and exercises the full
+        // remove-then-insert path of the helper.
+        vm.onReorderBrowsers(fromIndex = 0, toIndex = 2)
         testScheduler.advanceUntilIdle()
 
         assertEquals(
             listOf(
                 BrowserId("/Applications/Chrome.app"),
-                BrowserId("/Applications/Safari.app"),
                 BrowserId("/Applications/Firefox.app"),
+                BrowserId("/Applications/Safari.app"),
             ),
             vm.settings.value.browserOrder,
         )
     }
 
     @Test
-    fun onMoveBrowserUpAtFirstPositionIsNoOp() = runTest {
+    fun onReorderBrowsersWithSameFromAndToIsNoOp() = runTest {
+        // Drag gestures sometimes settle at the original index (e.g. user
+        // grabs but releases without moving). The helper must skip the
+        // persistence write rather than emitting a redundant order update.
         val repo = FakeSettingsRepository()
         val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
         val chrome = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome.app", null)
@@ -329,10 +336,9 @@ class SettingsViewModelTest {
         )
         testScheduler.advanceUntilIdle()
 
-        vm.onMoveBrowserUp(BrowserId("/Applications/Safari.app"))
+        vm.onReorderBrowsers(fromIndex = 0, toIndex = 0)
         testScheduler.advanceUntilIdle()
 
-        // No persisted order change; stays at default empty.
         assertEquals(emptyList(), vm.settings.value.browserOrder)
     }
 
@@ -769,51 +775,30 @@ class SettingsViewModelTest {
         assertEquals(rules, repo.settings.value.rules)
     }
 
-    // --- reorder() edge cases -------------------------------------------------
+    // --- onReorderBrowsers edge cases ----------------------------------------
 
     @Test
-    fun onMoveBrowserDownAtLastPositionIsNoOp() = runTest {
+    fun onReorderBrowsersWithOutOfRangeIndexIsNoOp() = runTest {
+        // Drag library can theoretically settle past the list bounds during
+        // reflow / layout transitions; we treat that as "drop somewhere
+        // invalid, leave the list alone" rather than indexing past the end.
         val repo = FakeSettingsRepository()
         val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
         val chrome = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome.app", null)
         val vm = newViewModel(repo = repo, browsers = listOf(safari, chrome), scope = this)
         testScheduler.advanceUntilIdle()
 
-        vm.onMoveBrowserDown(BrowserId("/Applications/Chrome.app"))
+        vm.onReorderBrowsers(fromIndex = 0, toIndex = 99)
+        vm.onReorderBrowsers(fromIndex = -1, toIndex = 0)
+        vm.onReorderBrowsers(fromIndex = 5, toIndex = 1)
         testScheduler.advanceUntilIdle()
 
         assertEquals(emptyList(), vm.settings.value.browserOrder)
     }
 
     @Test
-    fun onMoveBrowserDownForUnknownIdIsNoOp() = runTest {
-        val repo = FakeSettingsRepository()
-        val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
-        val vm = newViewModel(repo = repo, browsers = listOf(safari), scope = this)
-        testScheduler.advanceUntilIdle()
-
-        vm.onMoveBrowserDown(BrowserId("/Apps/DoesNotExist.app"))
-        testScheduler.advanceUntilIdle()
-
-        assertEquals(emptyList(), vm.settings.value.browserOrder)
-    }
-
-    @Test
-    fun onMoveBrowserUpForUnknownIdIsNoOp() = runTest {
-        val repo = FakeSettingsRepository()
-        val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
-        val vm = newViewModel(repo = repo, browsers = listOf(safari), scope = this)
-        testScheduler.advanceUntilIdle()
-
-        vm.onMoveBrowserUp(BrowserId("/Apps/DoesNotExist.app"))
-        testScheduler.advanceUntilIdle()
-
-        assertEquals(emptyList(), vm.settings.value.browserOrder)
-    }
-
-    @Test
-    fun onMoveBrowserDownWhileLoadingIsNoOp() = runTest {
-        // Reorder requires a Loaded state; if the user races a click against
+    fun onReorderBrowsersWhileLoadingIsNoOp() = runTest {
+        // Reorder requires a Loaded state; if the user races a drag against
         // an in-flight discovery, the helper bails before touching anything.
         // Isolated scope so the never-completing discovery launch can be
         // cancelled cleanly without runTest complaining about active jobs.
@@ -827,7 +812,7 @@ class SettingsViewModelTest {
             )
             // No advanceUntilIdle — discovery never resolves, state stays Loading.
 
-            vm.onMoveBrowserDown(BrowserId("/Apps/Whatever.app"))
+            vm.onReorderBrowsers(fromIndex = 0, toIndex = 1)
 
             assertEquals(BrowsersState.Loading, vm.browsers.value)
             assertEquals(emptyList(), vm.settings.value.browserOrder)

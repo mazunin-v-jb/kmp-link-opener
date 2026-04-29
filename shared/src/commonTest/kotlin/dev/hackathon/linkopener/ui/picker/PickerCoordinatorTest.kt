@@ -65,6 +65,35 @@ class PickerCoordinatorTest {
     }
 
     @Test
+    fun pickerFollowsTheUserOrderConfiguredInSettings() = runTest {
+        // Discovery returns browsers in the OS-walk order [safari, chrome,
+        // firefox]; the user has drag-reordered them in Settings to
+        // [firefox, chrome, safari]. The picker must show that exact order
+        // — no exclusions, no rules in this scenario, so a regression here
+        // points squarely at the order plumbing
+        // (`PickerCoordinator` → `applyUserOrder` → `settings.browserOrder`).
+        val settings = AppSettings(
+            browserOrder = listOf(
+                firefox.toBrowserId(),
+                chrome.toBrowserId(),
+                safari.toBrowserId(),
+            ),
+        )
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, chrome, firefox),
+            settings = settings,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        val state = coord.state.value
+        assertIs<PickerState.Showing>(state)
+        assertEquals(listOf(firefox, chrome, safari), state.browsers)
+    }
+
+    @Test
     fun userOrderIsRespectedAfterExclusionFilter() = runTest {
         val settings = AppSettings(
             excludedBrowserIds = setOf(chrome.toBrowserId()),

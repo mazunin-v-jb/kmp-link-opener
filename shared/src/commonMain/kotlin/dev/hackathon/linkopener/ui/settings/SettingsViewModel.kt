@@ -136,9 +136,25 @@ class SettingsViewModel(
         scope.launch { setBrowserExcluded(id, excluded) }
     }
 
-    fun onMoveBrowserUp(id: BrowserId) = reorder(id, -1)
-
-    fun onMoveBrowserDown(id: BrowserId) = reorder(id, +1)
+    /**
+     * Drag-and-drop reorder: move the browser at [fromIndex] to [toIndex],
+     * shifting everything in between by one slot. Eager UI update + async
+     * persistence, mirroring the old swap-with-neighbor pattern. Out-of-range
+     * indices and same-position drops are silent no-ops — drag gestures
+     * sometimes settle to no-op coordinates and we don't want spurious
+     * persistence writes.
+     */
+    fun onReorderBrowsers(fromIndex: Int, toIndex: Int) {
+        val state = _browsers.value as? BrowsersState.Loaded ?: return
+        val list = state.browsers
+        if (fromIndex == toIndex) return
+        if (fromIndex !in list.indices || toIndex !in list.indices) return
+        val moved = list.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+        // Update the visible list eagerly so the row settles in its new slot
+        // without waiting for the persistence round-trip.
+        _browsers.value = BrowsersState.Loaded(moved)
+        scope.launch { setBrowserOrder(moved.map { it.toBrowserId() }) }
+    }
 
     /**
      * Called from the desktop layer after the file-picker resolves. `null`
@@ -215,23 +231,6 @@ class SettingsViewModel(
     private fun mutateRules(transform: (List<UrlRule>) -> List<UrlRule>?) {
         val updated = transform(settings.value.rules) ?: return
         scope.launch { setRules(updated) }
-    }
-
-    private fun reorder(id: BrowserId, delta: Int) {
-        val state = _browsers.value as? BrowsersState.Loaded ?: return
-        val list = state.browsers
-        val from = list.indexOfFirst { it.toBrowserId() == id }
-        if (from < 0) return
-        val to = from + delta
-        if (to < 0 || to >= list.size) return
-        val swapped = list.toMutableList().apply {
-            val tmp = this[from]; this[from] = this[to]; this[to] = tmp
-        }
-        // Update the visible list eagerly so the row moves on click without
-        // waiting for the persistence round-trip; persist the new order in the
-        // background.
-        _browsers.value = BrowsersState.Loaded(swapped)
-        scope.launch { setBrowserOrder(swapped.map { it.toBrowserId() }) }
     }
 
     /**

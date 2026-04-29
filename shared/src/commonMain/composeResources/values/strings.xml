@@ -111,4 +111,5 @@
     <string name="tooltip_help">Help</string>
     <string name="tooltip_help_easter">HALP!!</string>
     <string name="tooltip_close">Close settings without quitting Link Opener</string>
+    <string name="tooltip_drag_to_reorder">Drag to reorder</string>
 </resources>

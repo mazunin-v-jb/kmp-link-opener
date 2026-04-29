@@ -144,4 +144,32 @@ object AppIcons {
             moveTo(6f, 13f); lineTo(12f, 19f); lineTo(18f, 13f)
         }
     }
+
+    // Six-dot 2×3 drag affordance — the platform-neutral "this row is
+    // draggable" cue used by macOS, Material, and most Linux toolkits.
+    // Drawn as filled circles so it tints cleanly via the consuming
+    // `Icon(tint = …)`.
+    val DragHandle: ImageVector = ImageVector.Builder(
+        name = "DragHandle",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = SolidColor(Color.Black),
+            stroke = null,
+            pathFillType = PathFillType.NonZero,
+        ) {
+            // Two columns of 3 dots at x=9 and x=15, y=6/12/18, radius 1.5.
+            for (x in listOf(9f, 15f)) {
+                for (y in listOf(6f, 12f, 18f)) {
+                    moveTo(x - 1.5f, y)
+                    arcTo(1.5f, 1.5f, 0f, isMoreThanHalf = true, isPositiveArc = true, x + 1.5f, y)
+                    arcTo(1.5f, 1.5f, 0f, isMoreThanHalf = true, isPositiveArc = true, x - 1.5f, y)
+                    close()
+                }
+            }
+        }
+    }.build()
 }
