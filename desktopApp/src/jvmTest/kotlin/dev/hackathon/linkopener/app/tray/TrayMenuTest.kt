@@ -1,6 +1,8 @@
 package dev.hackathon.linkopener.app.tray
 
+import java.awt.GraphicsEnvironment
 import javax.swing.JMenuItem
+import org.junit.Assume.assumeFalse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -51,6 +53,14 @@ class TrayMenuTest {
 
     @Test
     fun `invoker frame stays hidden and non-focus-stealing after creation`() {
+        // Constructing JFrame on a headless JVM (typical CI runner without
+        // an X display) throws HeadlessException. Guard like the macOS
+        // smoke tests in :shared do — the assertion exercises real AWT
+        // behaviour, so there's no good headless substitute.
+        assumeFalse(
+            "Skipping JFrame test under a headless JVM (CI runner without display).",
+            GraphicsEnvironment.isHeadless(),
+        )
         val invoker = createTrayMenuInvoker()
         try {
             // Hidden so it doesn't show up as a phantom window in the user's

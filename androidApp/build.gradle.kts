@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "dev.hackathon.linkopener.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "dev.hackathon.linkopener"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = providers.gradleProperty("linkopener.version").get()
     }
@@ -38,6 +38,7 @@ android {
             manifest.srcFile("src/main/AndroidManifest.xml")
         }
     }
+
 }
 
 kotlin {
