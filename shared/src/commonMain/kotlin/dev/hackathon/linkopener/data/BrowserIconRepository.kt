@@ -11,8 +11,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.jetbrains.skia.Image as SkiaImage
-import androidx.compose.ui.graphics.toComposeImageBitmap
 
 /**
  * In-memory cache that loads browser icons through a [BrowserIconLoader] and
@@ -61,7 +59,7 @@ class BrowserIconRepository(
                         .onFailure { logError("browser-icon", it) }
                         .getOrNull()
                     if (result != null) {
-                        val bitmap = decode(result)
+                        val bitmap = decodeImageBitmap(result)
                         if (bitmap != null) {
                             _icons.update { it + (path to bitmap) }
                         }
@@ -70,8 +68,4 @@ class BrowserIconRepository(
             }
         }
     }
-
-    private fun decode(bytes: ByteArray): ImageBitmap? = runCatchingNonCancellation {
-        SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
-    }.getOrNull()
 }

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose Material 3 supplies the colors at runtime; the platform
+         theme just needs to opt-out of the action bar (no AppCompat) and
+         provide a sensible window background. -->
+    <style name="Theme.LinkOpener" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+
+    <!-- Picker activity: translucent so the underlying app shows through
+         and the picker reads as a modal sheet. NoTitleBar removes the
+         system action bar; backgroundDimEnabled darkens the underlying
+         app for focus. -->
+    <style name="Theme.LinkOpener.Translucent" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+    </style>
+</resources>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Required since Android 11 (API 30) so PackageManager.queryIntentActivities
+         can see other browsers. Without this our discovery returns just our own
+         self-filtered entry. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".LinkOpenerApplication"
+        android:label="Link Opener"
+        android:theme="@style/Theme.LinkOpener">
+
+        <!-- Settings / launcher entry. Standard activity, normal theme. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Picker activity. singleInstance so rapid-fire link clicks don't
+             stack multiple pickers. Translucent theme so the picker reads
+             as a dialog over whatever app the user came from.
+             Two intent-filters because Android requires the BROWSABLE
+             category for browser registration to be picked up by the
+             Default Apps page. -->
+        <activity
+            android:name=".PickerActivity"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.LinkOpener.Translucent">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

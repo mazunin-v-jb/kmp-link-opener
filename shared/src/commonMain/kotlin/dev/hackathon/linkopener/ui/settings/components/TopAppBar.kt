@@ -1,7 +1,5 @@
 package dev.hackathon.linkopener.ui.settings.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import dev.hackathon.linkopener.ui.icons.AppIcons
 import dev.hackathon.linkopener.ui.strings.useLocaleNonce
 import dev.hackathon.linkopener.ui.theme.surfaceContainerLow
+import dev.hackathon.linkopener.ui.util.PlatformTooltip
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.app_name
 import kmp_link_opener.shared.generated.resources.tooltip_close
@@ -41,7 +40,6 @@ import org.jetbrains.compose.resources.stringResource
 // label stays consistent across hovers within a single session.
 private const val EASTER_EGG_PROBABILITY = 0.05f
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun SettingsTopAppBar(
     onRefresh: () -> Unit,
@@ -127,34 +125,14 @@ internal fun SettingsTopAppBar(
 }
 
 /**
- * Wraps an icon-button in a hover tooltip styled to match the rest of the
- * top app bar. Compose Desktop's `TooltipArea` shows the tooltip after a
- * short hover delay and dismisses it on mouse leave or click.
+ * Wraps an icon-button in a hover tooltip on desktop; on Android the
+ * tooltip is dropped (touch UIs have no hover) and we just emit content.
+ * The actual rendering lives in `PlatformTooltip` actuals.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TopBarTooltip(
     text: String,
     content: @Composable () -> Unit,
 ) {
-    TooltipArea(
-        tooltip = {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = RoundedCornerShape(6.dp),
-                tonalElevation = 4.dp,
-                shadowElevation = 8.dp,
-            ) {
-                Text(
-                    text = text,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        },
-        delayMillis = 500,
-    ) {
-        content()
-    }
+    PlatformTooltip(text = text, content = content)
 }

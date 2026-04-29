@@ -55,7 +55,7 @@ object PlatformFactory {
         HostOs.MacOs -> MacOsBrowserMetadataExtractor()
         HostOs.Windows -> WindowsBrowserMetadataExtractor()
         HostOs.Linux,
-        HostOs.Other -> UnsupportedManualBrowserExtractor()
+        HostOs.Other -> UnsupportedManualBrowserExtractor(System.getProperty("os.name").orEmpty())
     }
 
     fun createBrowserIconLoader(): BrowserIconLoader = when (currentOs) {

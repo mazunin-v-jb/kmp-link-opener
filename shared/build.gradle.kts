@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.kover)
+    alias(libs.plugins.android.library)
 }
 
 // Make the generated `Res` class public so the desktopApp module can reach
@@ -49,6 +50,13 @@ kotlin {
         compilerOptions { jvmTarget = JvmTarget.JVM_17 }
     }
 
+    androidTarget {
+        compilerOptions { jvmTarget = JvmTarget.JVM_17 }
+        // Publish only the release variant — the debug variant pulls extra
+        // overhead we don't need for a library consumed by :androidApp.
+        publishLibraryVariants("release")
+    }
+
     sourceSets {
         commonMain {
             kotlin.srcDir(generatedVersionDir)
@@ -70,6 +78,30 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
 
+        // Skia native runtime for the host OS — required by tests that
+        // exercise PlatformImageDecoder.jvm. The multiplatform Compose deps
+        // in commonMain only bring the API stubs; the actual libskiko-*
+        // native lib comes from compose.desktop.currentOs.
+        val jvmTest by getting {
+            dependencies {
+                implementation(compose.desktop.currentOs)
+            }
+        }
+
+        // Robolectric — runs Android framework code (Intent, PackageManager,
+        // ResolveInfo, etc.) on a host JVM by substituting "shadow" impls
+        // for the stub-only android.jar. Without it, every Android test
+        // would throw RuntimeException("Stub!") on first framework call.
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(libs.junit)
+                implementation(libs.robolectric)
+                // ApplicationProvider — provides a Robolectric-managed
+                // Application instance to tests that need a Context.
+                implementation(libs.androidx.test.core)
+            }
+        }
+
         jvmMain.dependencies {
             implementation(libs.kotlinx.coroutines.swing)
             // JNA — used on Windows to call shell32!SHChangeNotify after
@@ -83,6 +115,29 @@ kotlin {
 // Make every Kotlin compile pick up the freshly-generated BuildVersion.kt.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
     dependsOn(generateBuildVersion)
+}
+
+// Stage 09 A2 — Android Gradle Plugin extension. The KMP plugin wires the
+// `androidMain` source set automatically; we just need the basics here:
+// namespace (mandatory since AGP 7.x), SDK levels, and source/target Java
+// version to match the JVM target.
+android {
+    namespace = "dev.hackathon.linkopener.shared"
+    compileSdk = 35
+    defaultConfig {
+        minSdk = 26
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    // Robolectric needs a real-ish Android resource graph + a target SDK
+    // declaration to pick a runtime version. Without `isReturnDefaultValues`
+    // any Android-stub call from non-Robolectric tests would throw; we
+    // leave it false because Robolectric supplies real impls.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 kover {

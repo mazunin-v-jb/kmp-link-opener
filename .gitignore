@@ -5,6 +5,7 @@
 .idea
 .kotlin
 .DS_Store
+.claude/
 build
 */build
 captures

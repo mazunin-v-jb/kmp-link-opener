@@ -1,6 +1,5 @@
 package dev.hackathon.linkopener.ui.picker
 
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,9 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.hackathon.linkopener.ui.util.PlatformVerticalScrollbar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -137,8 +136,8 @@ private fun ScrollableBrowserList(
                 )
             }
         }
-        VerticalScrollbar(
-            adapter = rememberScrollbarAdapter(scrollState),
+        PlatformVerticalScrollbar(
+            scrollState = scrollState,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight(),
