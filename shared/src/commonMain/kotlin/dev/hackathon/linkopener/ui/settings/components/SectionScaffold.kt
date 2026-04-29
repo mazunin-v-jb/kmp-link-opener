@@ -23,7 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,7 +32,7 @@ import dev.hackathon.linkopener.ui.theme.surfaceContainerLowest
 @Composable
 internal fun SectionPane(
     title: String,
-    icon: ImageVector,
+    icon: Painter,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -50,7 +50,7 @@ internal fun SectionPane(
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = icon,
+                        painter = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(22.dp),

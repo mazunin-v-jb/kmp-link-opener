@@ -63,7 +63,7 @@ internal fun RulesSection(
     onUpdateRulePattern: (index: Int, pattern: String) -> Unit,
     onUpdateRuleBrowser: (index: Int, browserId: BrowserId) -> Unit,
 ) {
-    SectionPane(stringResource(Res.string.section_rules), AppIcons.SettingsSuggest) {
+    SectionPane(stringResource(Res.string.section_rules), AppIcons.Rules) {
         if (availableBrowsers.isEmpty()) {
             SectionCard {
                 Text(
@@ -221,7 +221,7 @@ private fun RuleRow(
         }
         IconButton(onClick = onRemove) {
             Icon(
-                imageVector = AppIcons.Close,
+                painter = AppIcons.Close,
                 contentDescription = stringResource(Res.string.rule_remove_content_description),
                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
             )

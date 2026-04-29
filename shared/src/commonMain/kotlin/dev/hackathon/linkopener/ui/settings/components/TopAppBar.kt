@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.hackathon.linkopener.ui.icons.AppIcons
@@ -33,7 +32,6 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun SettingsTopAppBar(
-    appIconPainter: Painter?,
     onRefresh: () -> Unit,
     onCloseRequest: () -> Unit,
 ) {
@@ -50,17 +48,15 @@ internal fun SettingsTopAppBar(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (appIconPainter != null) {
-                Box(modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        painter = appIconPainter,
-                        contentDescription = appName,
-                        tint = Color.Unspecified,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
+            Box(modifier = Modifier.size(24.dp)) {
+                Icon(
+                    painter = AppIcons.AppLogoV2,
+                    contentDescription = appName,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
+            Spacer(Modifier.width(12.dp))
             Text(
                 text = appName,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -69,21 +65,21 @@ internal fun SettingsTopAppBar(
             Spacer(Modifier.weight(1f))
             IconButton(onClick = onRefresh) {
                 Icon(
-                    imageVector = AppIcons.Refresh,
+                    painter = AppIcons.Reload,
                     contentDescription = stringResource(Res.string.refresh_action),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = { /* TODO: help action */ }) {
                 Icon(
-                    imageVector = AppIcons.Help,
+                    painter = AppIcons.Help,
                     contentDescription = stringResource(Res.string.helpStr),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onCloseRequest) {
                 Icon(
-                    imageVector = AppIcons.Close,
+                    painter = AppIcons.Close,
                     contentDescription = stringResource(Res.string.closeStr),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -24,7 +24,7 @@ internal fun LanguageSection(
     current: AppLanguage,
     onSelected: (AppLanguage) -> Unit,
 ) {
-    SectionPane(stringResource(Res.string.section_language), AppIcons.Translate) {
+    SectionPane(stringResource(Res.string.section_language), AppIcons.Language) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),

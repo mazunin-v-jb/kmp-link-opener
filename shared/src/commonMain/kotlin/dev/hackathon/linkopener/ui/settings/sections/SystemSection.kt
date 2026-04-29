@@ -35,7 +35,7 @@ internal fun SystemSection(
     showBrowserProfiles: Boolean,
     onShowBrowserProfilesChange: (Boolean) -> Unit,
 ) {
-    SectionPane(stringResource(Res.string.section_system), AppIcons.SettingsSuggest) {
+    SectionPane(stringResource(Res.string.section_system), AppIcons.System) {
         SectionCard {
             ToggleRow(
                 title = stringResource(Res.string.start_at_login),

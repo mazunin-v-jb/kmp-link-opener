@@ -20,7 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,32 +78,32 @@ internal fun Sidebar(
             }
 
             NavItem(
-                AppIcons.BrowserUpdated, stringResource(Res.string.section_default_browser),
+                AppIcons.DefaultBrowser, stringResource(Res.string.section_default_browser),
                 active = activeSection == NavSection.DefaultBrowser,
                 onClick = { onSelect(NavSection.DefaultBrowser) },
             )
             NavItem(
-                AppIcons.Palette, stringResource(Res.string.section_appearance),
+                AppIcons.Appearance, stringResource(Res.string.section_appearance),
                 active = activeSection == NavSection.Appearance,
                 onClick = { onSelect(NavSection.Appearance) },
             )
             NavItem(
-                AppIcons.Translate, stringResource(Res.string.section_language),
+                AppIcons.Language, stringResource(Res.string.section_language),
                 active = activeSection == NavSection.Language,
                 onClick = { onSelect(NavSection.Language) },
             )
             NavItem(
-                AppIcons.SettingsSuggest, stringResource(Res.string.section_system),
+                AppIcons.System, stringResource(Res.string.section_system),
                 active = activeSection == NavSection.System,
                 onClick = { onSelect(NavSection.System) },
             )
             NavItem(
-                AppIcons.Settings, stringResource(Res.string.section_browser_exclusions),
+                AppIcons.BrowserExclusions, stringResource(Res.string.section_browser_exclusions),
                 active = activeSection == NavSection.Exclusions,
                 onClick = { onSelect(NavSection.Exclusions) },
             )
             NavItem(
-                AppIcons.SettingsSuggest, stringResource(Res.string.section_rules),
+                AppIcons.Rules, stringResource(Res.string.section_rules),
                 active = activeSection == NavSection.Rules,
                 onClick = { onSelect(NavSection.Rules) },
             )
@@ -113,7 +113,7 @@ internal fun Sidebar(
 
 @Composable
 private fun NavItem(
-    icon: ImageVector,
+    icon: Painter,
     label: String,
     active: Boolean,
     onClick: () -> Unit,
@@ -132,7 +132,7 @@ private fun NavItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = icon,
+            painter = icon,
             contentDescription = null,
             tint = if (active) activeFg else inactiveFg,
             modifier = Modifier.size(20.dp),
