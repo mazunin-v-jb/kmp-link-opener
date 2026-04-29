@@ -63,6 +63,7 @@
     <string name="default_browser_instructions_header">Как сделать Link Opener браузером по умолчанию</string>
     <string name="default_browser_open_system_settings">Открыть системные настройки</string>
     <string name="default_browser_packaging_note">Пока Link Opener не упакован в установщик, ОС не будет показывать его в списке кандидатов. Подготовьте шаги сейчас, а завершите после ближайшего релиза с пакетом.</string>
+    <string name="default_browser_refresh_hint">Если статус не обновился сразу — нажмите кнопку обновления в правом верхнем углу.</string>
     <string name="default_browser_unsupported_os">Эта операционная система пока не поддерживается.</string>
 
     <string-array name="default_browser_instructions_macos">
@@ -95,4 +96,11 @@
 
     <!-- Single-instance nudge -->
     <string name="nudge_already_running">Я тут. Услышал тебя ещё в первый раз.</string>
+
+    <!-- TopAppBar tooltips + easter eggs (5% chance per Settings open) -->
+    <string name="tooltip_refresh">Обновить настройки</string>
+    <string name="tooltip_refresh_easter">В любой непонятной ситуации жми сюда</string>
+    <string name="tooltip_help">Помощь</string>
+    <string name="tooltip_help_easter">ПАМАГИТЕ!!</string>
+    <string name="tooltip_close">Закрыть окно настроек, не завершая работу</string>
 </resources>

@@ -63,7 +63,7 @@
     <string name="tray_window_settings_suffix">" — Settings"</string>
 
     <!-- Default-browser banner + section -->
-    <string name="banner_not_default_title">Link Opener isn\'t your default browser</string>
+    <string name="banner_not_default_title">Link Opener isn't your default browser</string>
     <string name="banner_not_default_body">Set Link Opener as the default to intercept links opened from any app.</string>
     <string name="banner_open_settings">Open settings</string>
     <string name="default_browser_status_yes">Link Opener is currently the default browser.</string>
@@ -71,7 +71,8 @@
     <string name="default_browser_instructions_header">How to make Link Opener your default</string>
     <string name="default_browser_open_system_settings">Open System Settings</string>
     <string name="default_browser_packaging_note">Until Link Opener is installed via a packaged build, the OS will not list it as a browser candidate. You can prepare the steps now and finish them after the next packaging release.</string>
-    <string name="default_browser_unsupported_os">This operating system isn\'t supported yet.</string>
+    <string name="default_browser_refresh_hint">If the status didn't update right away, hit the refresh button in the top-right corner.</string>
+    <string name="default_browser_unsupported_os">This operating system isn't supported yet.</string>
 
     <string-array name="default_browser_instructions_macos">
         <item>Click the button below to open System Settings → Desktop &amp; Dock.</item>
@@ -86,7 +87,7 @@
     <string-array name="default_browser_instructions_linux">
         <item>Open a terminal.</item>
         <item>Run: xdg-settings set default-web-browser link-opener.desktop</item>
-        <item>Or use your distribution\'s default-applications manager (e.g., GNOME Control Center → Default Applications).</item>
+        <item>Or use your distribution's default-applications manager (e.g., GNOME Control Center → Default Applications).</item>
     </string-array>
 
     <!-- Browser list states -->
@@ -103,4 +104,11 @@
 
     <!-- Single-instance nudge -->
     <string name="nudge_already_running">Already here. I heard you the first time.</string>
+
+    <!-- TopAppBar tooltips + easter eggs (5% chance per Settings open) -->
+    <string name="tooltip_refresh">Refresh settings</string>
+    <string name="tooltip_refresh_easter">Have you tried turning it off and on again?</string>
+    <string name="tooltip_help">Help</string>
+    <string name="tooltip_help_easter">HALP!!</string>
+    <string name="tooltip_close">Close settings without quitting Link Opener</string>
 </resources>

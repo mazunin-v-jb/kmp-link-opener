@@ -1,5 +1,7 @@
 package dev.hackathon.linkopener.ui.settings.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,15 +11,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.hackathon.linkopener.ui.icons.AppIcons
@@ -25,11 +28,20 @@ import dev.hackathon.linkopener.ui.strings.useLocaleNonce
 import dev.hackathon.linkopener.ui.theme.surfaceContainerLow
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.app_name
-import kmp_link_opener.shared.generated.resources.close as closeStr
-import kmp_link_opener.shared.generated.resources.help as helpStr
-import kmp_link_opener.shared.generated.resources.refresh_action
+import kmp_link_opener.shared.generated.resources.tooltip_close
+import kmp_link_opener.shared.generated.resources.tooltip_help
+import kmp_link_opener.shared.generated.resources.tooltip_help_easter
+import kmp_link_opener.shared.generated.resources.tooltip_refresh
+import kmp_link_opener.shared.generated.resources.tooltip_refresh_easter
+import kotlin.random.Random
 import org.jetbrains.compose.resources.stringResource
 
+// Probability of swapping a tooltip's normal label for its meme variant.
+// Rolled once per Settings open (see `remember { … }` in the body), so the
+// label stays consistent across hovers within a single session.
+private const val EASTER_EGG_PROBABILITY = 0.05f
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun SettingsTopAppBar(
     onRefresh: () -> Unit,
@@ -37,6 +49,26 @@ internal fun SettingsTopAppBar(
 ) {
     useLocaleNonce()
     val appName = stringResource(Res.string.app_name)
+
+    // Roll the dice once per composition entry — i.e. per "open Settings"
+    // — so a session that opened with the meme keeps showing the meme
+    // until the user closes + reopens. The `remember` key has no inputs,
+    // so the value survives recompositions inside the open session.
+    val showRefreshEaster = remember { Random.nextFloat() < EASTER_EGG_PROBABILITY }
+    val showHelpEaster = remember { Random.nextFloat() < EASTER_EGG_PROBABILITY }
+
+    val refreshTooltip = if (showRefreshEaster) {
+        stringResource(Res.string.tooltip_refresh_easter)
+    } else {
+        stringResource(Res.string.tooltip_refresh)
+    }
+    val helpTooltip = if (showHelpEaster) {
+        stringResource(Res.string.tooltip_help_easter)
+    } else {
+        stringResource(Res.string.tooltip_help)
+    }
+    val closeTooltip = stringResource(Res.string.tooltip_close)
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = surfaceContainerLow(),
@@ -63,27 +95,66 @@ internal fun SettingsTopAppBar(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = onRefresh) {
-                Icon(
-                    painter = AppIcons.Reload,
-                    contentDescription = stringResource(Res.string.refresh_action),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            TopBarTooltip(text = refreshTooltip) {
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        painter = AppIcons.Reload,
+                        contentDescription = refreshTooltip,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            IconButton(onClick = { /* TODO: help action */ }) {
-                Icon(
-                    painter = AppIcons.Help,
-                    contentDescription = stringResource(Res.string.helpStr),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            TopBarTooltip(text = helpTooltip) {
+                IconButton(onClick = { /* TODO: help action */ }) {
+                    Icon(
+                        painter = AppIcons.Help,
+                        contentDescription = helpTooltip,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            IconButton(onClick = onCloseRequest) {
-                Icon(
-                    painter = AppIcons.Close,
-                    contentDescription = stringResource(Res.string.closeStr),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            TopBarTooltip(text = closeTooltip) {
+                IconButton(onClick = onCloseRequest) {
+                    Icon(
+                        painter = AppIcons.Close,
+                        contentDescription = closeTooltip,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
+    }
+}
+
+/**
+ * Wraps an icon-button in a hover tooltip styled to match the rest of the
+ * top app bar. Compose Desktop's `TooltipArea` shows the tooltip after a
+ * short hover delay and dismisses it on mouse leave or click.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TopBarTooltip(
+    text: String,
+    content: @Composable () -> Unit,
+) {
+    TooltipArea(
+        tooltip = {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(6.dp),
+                tonalElevation = 4.dp,
+                shadowElevation = 8.dp,
+            ) {
+                Text(
+                    text = text,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        },
+        delayMillis = 500,
+    ) {
+        content()
     }
 }

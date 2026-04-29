@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
@@ -21,6 +22,7 @@ import dev.hackathon.linkopener.ui.settings.SettingsViewModel
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
 import java.awt.FileDialog
 import java.awt.Frame
+import java.awt.GraphicsEnvironment
 import java.awt.MouseInfo
 import java.io.File
 import kotlinx.coroutines.channels.BufferOverflow
@@ -74,6 +76,10 @@ private fun ApplicationScope.TrayHostBody(
     val pickerState by container.pickerCoordinator.state.collectAsState()
     val browserIcons by container.browserIconRepository.icons.collectAsState()
 
+    // `null` = window closed. A non-null anchor flips the visibility on and
+    // also fixes the spawn position for that opening — closing + reopening
+    // recomputes it, so the window keeps re-centering on whichever screen
+    // the cursor is on now.
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
     // Nudges flow into the open Settings window when a second copy of the app
@@ -86,7 +92,7 @@ private fun ApplicationScope.TrayHostBody(
     LaunchedEffect(container) {
         container.activationRequests.collect {
             if (settingsAnchor == null) {
-                settingsAnchor = currentCursorPosition()
+                settingsAnchor = currentScreenCenterPosition(SETTINGS_WIDTH, SETTINGS_HEIGHT)
             } else {
                 settingsNudges.tryEmit(Unit)
             }
@@ -101,9 +107,13 @@ private fun ApplicationScope.TrayHostBody(
         iconPainter = appIconPainter,
         tooltip = appName,
         hostOs = container.currentOs,
-        onLeftClick = { settingsAnchor = currentCursorPosition() },
+        onLeftClick = {
+            settingsAnchor = currentScreenCenterPosition(SETTINGS_WIDTH, SETTINGS_HEIGHT)
+        },
         menuItems = listOf(
-            TrayMenuItem(settingsLabel) { settingsAnchor = currentCursorPosition() },
+            TrayMenuItem(settingsLabel) {
+                settingsAnchor = currentScreenCenterPosition(SETTINGS_WIDTH, SETTINGS_HEIGHT)
+            },
             TrayMenuItem(quitLabel, onExit),
         ),
     )
@@ -125,8 +135,8 @@ private fun ApplicationScope.TrayHostBody(
     if (anchor != null) {
         val windowState = rememberWindowState(
             position = anchor,
-            width = 960.dp,
-            height = 640.dp,
+            width = SETTINGS_WIDTH,
+            height = SETTINGS_HEIGHT,
         )
         Window(
             onCloseRequest = { settingsAnchor = null },
@@ -155,9 +165,37 @@ private fun ApplicationScope.TrayHostBody(
     }
 }
 
-private fun currentCursorPosition(): WindowPosition {
-    val location = MouseInfo.getPointerInfo()?.location ?: return WindowPosition.PlatformDefault
-    return WindowPosition(x = location.x.dp, y = location.y.dp)
+// Single source of truth for the Settings window dimensions — both the
+// initial position calculation and `rememberWindowState` size derive from
+// here, so a tweak to the window size doesn't drift the centering math.
+private val SETTINGS_WIDTH = 960.dp
+private val SETTINGS_HEIGHT = 640.dp
+
+/**
+ * Centers a window of [windowWidth] × [windowHeight] on whichever monitor
+ * the mouse cursor currently lives on. Works around the previous behavior
+ * of opening at the cursor (i.e. at the tray icon), which on Windows put
+ * the window at the bottom of the screen because the taskbar is anchored
+ * there.
+ *
+ * Multi-monitor handled by [pickScreenBoundsForCursor]: walk every
+ * connected display and pick the one whose bounds contain the cursor,
+ * falling back to the primary screen if the cursor isn't on any visible
+ * display (locked session, between monitors during reconfigure, …).
+ *
+ * The actual centering math is in [centerInBounds] for unit-testing —
+ * this function is just the AWT side-effect glue around it.
+ */
+private fun currentScreenCenterPosition(
+    windowWidth: Dp,
+    windowHeight: Dp,
+): WindowPosition {
+    val cursor = MouseInfo.getPointerInfo()?.location ?: return WindowPosition.PlatformDefault
+    val env = GraphicsEnvironment.getLocalGraphicsEnvironment()
+    val allBounds = env.screenDevices.map { it.defaultConfiguration.bounds }
+    val fallback = env.defaultScreenDevice.defaultConfiguration.bounds
+    val targetBounds = pickScreenBoundsForCursor(allBounds, fallback, cursor)
+    return centerInBounds(targetBounds, windowWidth, windowHeight)
 }
 
 private fun pickBrowserAppPath(): String? {

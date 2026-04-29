@@ -28,6 +28,7 @@ import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.default_browser_instructions_header
 import kmp_link_opener.shared.generated.resources.default_browser_open_system_settings
 import kmp_link_opener.shared.generated.resources.default_browser_packaging_note
+import kmp_link_opener.shared.generated.resources.default_browser_refresh_hint
 import kmp_link_opener.shared.generated.resources.default_browser_status_no
 import kmp_link_opener.shared.generated.resources.default_browser_status_yes
 import kmp_link_opener.shared.generated.resources.section_default_browser
@@ -99,6 +100,16 @@ internal fun DefaultBrowserSection(
                         Text(stringResource(Res.string.default_browser_open_system_settings))
                     }
                 }
+                // Hint after the steps + button: macOS only flips the
+                // default-browser indicator when the user actually picks one
+                // in System Settings, and our WatchService against the
+                // LaunchServices plist may miss an event during reconfigure.
+                // The TopAppBar refresh button forces a re-read.
+                Text(
+                    text = stringResource(Res.string.default_browser_refresh_hint),
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
