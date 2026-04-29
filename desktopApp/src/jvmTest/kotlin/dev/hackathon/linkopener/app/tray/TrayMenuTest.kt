@@ -52,7 +52,7 @@ class TrayMenuTest {
     }
 
     @Test
-    fun `invoker frame stays hidden and non-focus-stealing after creation`() {
+    fun `invoker frame is hidden, undecorated, and wires a focus listener for dismiss`() {
         // Constructing JFrame on a headless JVM (typical CI runner without
         // an X display) throws HeadlessException. Guard like the macOS
         // smoke tests in :shared do — the assertion exercises real AWT
@@ -63,14 +63,14 @@ class TrayMenuTest {
         )
         val invoker = createTrayMenuInvoker()
         try {
-            // Hidden so it doesn't show up as a phantom window in the user's
-            // task switcher / Dock. Non-focusable-window-state so opening the
-            // popup doesn't steal focus from the foreground app — the popup
-            // appears at the cursor without making the user's text caret blink
-            // away.
             assertFalse(invoker.isVisible)
-            assertFalse(invoker.focusableWindowState)
             assertEquals(true, invoker.isUndecorated)
+            // Outside-click dismiss is implemented via a WindowFocusListener
+            // (see TrayMenu.createTrayMenuInvoker) — invoker must stay
+            // focusable so it can lose focus to the user's next click. The
+            // listener wiring is the dismiss contract; assert it exists.
+            assertEquals(true, invoker.focusableWindowState)
+            assertEquals(1, invoker.windowFocusListeners.size)
         } finally {
             invoker.dispose()
         }
