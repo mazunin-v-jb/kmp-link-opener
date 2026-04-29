@@ -76,7 +76,7 @@ internal fun ExclusionsSection(
     onDismissManualAddNotice: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    SectionPane(stringResource(Res.string.section_browser_exclusions), AppIcons.Settings) {
+    SectionPane(stringResource(Res.string.section_browser_exclusions), AppIcons.BrowserExclusions) {
         if (manualAddNotice != null) {
             ManualAddNoticeBanner(
                 notice = manualAddNotice,
@@ -130,7 +130,7 @@ private fun ManualAddNoticeBanner(
             )
             IconButton(onClick = onDismiss) {
                 Icon(
-                    imageVector = AppIcons.Close,
+                    painter = AppIcons.Close,
                     contentDescription = stringResource(Res.string.manual_add_dismiss),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
@@ -333,7 +333,7 @@ private fun BrowserRow(
         if (isManual) {
             IconButton(onClick = onRemoveManual) {
                 Icon(
-                    imageVector = AppIcons.Close,
+                    painter = AppIcons.Close,
                     contentDescription = stringResource(Res.string.remove_manual_browser),
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
                 )

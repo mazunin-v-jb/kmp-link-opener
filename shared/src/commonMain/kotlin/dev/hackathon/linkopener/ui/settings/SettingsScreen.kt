@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.platform.HostOs
@@ -45,7 +44,6 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     appVersion: String,
     currentOs: HostOs,
-    appIconPainter: Painter? = null,
     onCloseRequest: () -> Unit = {},
     // No-op default keeps existing call sites and tests compiling. The
     // desktopApp wires this to a native AWT FileDialog and forwards the
@@ -80,7 +78,6 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     SettingsTopAppBar(
-                        appIconPainter = appIconPainter,
                         onRefresh = viewModel::refresh,
                         onCloseRequest = onCloseRequest,
                     )

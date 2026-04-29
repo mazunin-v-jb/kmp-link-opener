@@ -1,19 +1,47 @@
 package dev.hackathon.linkopener.ui.icons
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
+import kmp_link_opener.shared.generated.resources.Res
+import kmp_link_opener.shared.generated.resources.app_logo_v2
+import kmp_link_opener.shared.generated.resources.appearance_fill
+import kmp_link_opener.shared.generated.resources.appearance_line
+import kmp_link_opener.shared.generated.resources.browser_exclusions_fill
+import kmp_link_opener.shared.generated.resources.browser_exclusions_line
+import kmp_link_opener.shared.generated.resources.close_fill
+import kmp_link_opener.shared.generated.resources.close_line
+import kmp_link_opener.shared.generated.resources.default_browser_fill
+import kmp_link_opener.shared.generated.resources.default_browser_line
+import kmp_link_opener.shared.generated.resources.help_fill
+import kmp_link_opener.shared.generated.resources.help_line
+import kmp_link_opener.shared.generated.resources.language_fill
+import kmp_link_opener.shared.generated.resources.language_line
+import kmp_link_opener.shared.generated.resources.reload_fill
+import kmp_link_opener.shared.generated.resources.reload_line
+import kmp_link_opener.shared.generated.resources.rules_fill
+import kmp_link_opener.shared.generated.resources.rules_line
+import kmp_link_opener.shared.generated.resources.system_fill
+import kmp_link_opener.shared.generated.resources.system_line
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
-// Hand-rolled, line-style ImageVectors for the section icons + utility icons.
-// Stroke-based on a 24x24 viewport so they read crisp at typical desktop
-// densities. Drawn to evoke the same shapes as the Material Symbols used in
-// the design mockups (palette / translate / settings_suggest / browser_updated)
-// without pulling in the full material-icons-extended dependency.
+// Section + utility icons live as theme-aware Painter accessors backed by the
+// SVGs in composeResources/drawable/. Light theme uses the outlined "_line"
+// variant; dark theme switches to the bolder "_fill" variant for better
+// contrast against darker surfaces. SVGs use `currentColor`, so callers can
+// keep using `Icon(painter, tint = ...)` and the path will pick up the tint.
+//
+// The remaining ImageVectors (Add, Search, ChevronDown, ArrowUp, ArrowDown)
+// are kept hand-rolled — the new design pack does not include replacements.
 
 private fun line(
     name: String,
@@ -42,86 +70,46 @@ private fun ImageVector.Builder.stroke(
     )
 }
 
-private fun ImageVector.Builder.fill(
-    color: Color = Color.Black,
-    pathBuilder: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit,
-) {
-    path(
-        fill = SolidColor(color),
-        stroke = null,
-        pathFillType = PathFillType.NonZero,
-        pathBuilder = pathBuilder,
-    )
-}
-
 object AppIcons {
 
-    val Palette: ImageVector = line("Palette") {
-        stroke {
-            // Outer palette body (rounded blob)
-            moveTo(12f, 3f)
-            arcTo(9f, 9f, 0f, isMoreThanHalf = false, isPositiveArc = true, 21f, 12f)
-            curveTo(21f, 14.5f, 19f, 16f, 17f, 16f)
-            horizontalLineTo(15f)
-            curveTo(13.5f, 16f, 13f, 17f, 13f, 18f)
-            curveTo(13f, 19.5f, 14f, 20f, 14f, 21f)
-            curveTo(14f, 21.5f, 13f, 22f, 12f, 22f)
-            curveTo(7f, 22f, 3f, 17.5f, 3f, 12f)
-            curveTo(3f, 7f, 7f, 3f, 12f, 3f)
-            close()
-        }
-        fill {
-            // Color dots
-            moveTo(7.5f, 11f); arcTo(1.25f, 1.25f, 0f, true, true, 7.5f, 13.5f); arcTo(1.25f, 1.25f, 0f, true, true, 7.5f, 11f); close()
-            moveTo(11f, 7f); arcTo(1.25f, 1.25f, 0f, true, true, 11f, 9.5f); arcTo(1.25f, 1.25f, 0f, true, true, 11f, 7f); close()
-            moveTo(15f, 7f); arcTo(1.25f, 1.25f, 0f, true, true, 15f, 9.5f); arcTo(1.25f, 1.25f, 0f, true, true, 15f, 7f); close()
-            moveTo(18.5f, 11f); arcTo(1.25f, 1.25f, 0f, true, true, 18.5f, 13.5f); arcTo(1.25f, 1.25f, 0f, true, true, 18.5f, 11f); close()
-        }
-    }
+    val DefaultBrowser: Painter
+        @Composable get() = themed(Res.drawable.default_browser_line, Res.drawable.default_browser_fill)
 
-    val Translate: ImageVector = line("Translate") {
-        stroke {
-            // Latin "A"
-            moveTo(3f, 16f); lineTo(6f, 7f); lineTo(9f, 16f)
-            moveTo(4f, 13f); lineTo(8f, 13f)
-            // Asian glyph block (simplified)
-            moveTo(13f, 7f); horizontalLineTo(21f)
-            moveTo(17f, 7f); verticalLineTo(9f)
-            moveTo(13f, 11f); horizontalLineTo(21f)
-            moveTo(15f, 13f); curveTo(15f, 17f, 19f, 19f, 21f, 19f)
-            moveTo(20f, 13f); curveTo(20f, 16f, 17f, 18f, 13f, 19f)
-        }
-    }
+    val Appearance: Painter
+        @Composable get() = themed(Res.drawable.appearance_line, Res.drawable.appearance_fill)
 
-    val SettingsSuggest: ImageVector = line("SettingsSuggest") {
-        stroke {
-            // Gear (simplified 8-tooth)
-            moveTo(12f, 8f); arcTo(4f, 4f, 0f, true, true, 12f, 16f); arcTo(4f, 4f, 0f, true, true, 12f, 8f); close()
-            moveTo(12f, 3f); verticalLineTo(5f)
-            moveTo(12f, 19f); verticalLineTo(21f)
-            moveTo(3f, 12f); horizontalLineTo(5f)
-            moveTo(19f, 12f); horizontalLineTo(21f)
-            moveTo(5.6f, 5.6f); lineTo(7f, 7f)
-            moveTo(17f, 17f); lineTo(18.4f, 18.4f)
-            moveTo(5.6f, 18.4f); lineTo(7f, 17f)
-            moveTo(17f, 7f); lineTo(18.4f, 5.6f)
-        }
-        fill {
-            // Spark accents next to gear
-            moveTo(20.5f, 4.5f); lineTo(21f, 3f); lineTo(21.5f, 4.5f); lineTo(23f, 5f); lineTo(21.5f, 5.5f); lineTo(21f, 7f); lineTo(20.5f, 5.5f); lineTo(19f, 5f); close()
-        }
-    }
+    val Language: Painter
+        @Composable get() = themed(Res.drawable.language_line, Res.drawable.language_fill)
 
-    val BrowserUpdated: ImageVector = line("BrowserUpdated") {
-        stroke {
-            // Browser frame
-            moveTo(3f, 6f); horizontalLineTo(21f); verticalLineTo(19f); horizontalLineTo(3f); close()
-            moveTo(3f, 9f); horizontalLineTo(21f)
-            // Down-arrow inside
-            moveTo(12f, 11.5f); verticalLineTo(16f)
-            moveTo(9.5f, 13.5f); lineTo(12f, 16f); lineTo(14.5f, 13.5f)
-        }
-    }
+    val System: Painter
+        @Composable get() = themed(Res.drawable.system_line, Res.drawable.system_fill)
+
+    val BrowserExclusions: Painter
+        @Composable get() = themed(Res.drawable.browser_exclusions_line, Res.drawable.browser_exclusions_fill)
+
+    val Rules: Painter
+        @Composable get() = themed(Res.drawable.rules_line, Res.drawable.rules_fill)
+
+    val Close: Painter
+        @Composable get() = themed(Res.drawable.close_line, Res.drawable.close_fill)
+
+    val Help: Painter
+        @Composable get() = themed(Res.drawable.help_line, Res.drawable.help_fill)
+
+    val Reload: Painter
+        @Composable get() = themed(Res.drawable.reload_line, Res.drawable.reload_fill)
+
+    // Single application logo asset shared across tray, window decoration
+    // (Dock badge on macOS) and the Settings TopAppBar. No fill/line pair —
+    // when used in `Icon(painter = …)` with a `tint`, Material's SrcIn filter
+    // recolors the shape to match theme; in raw `Image`/`Tray` slots it
+    // renders as-is.
+    val AppLogoV2: Painter
+        @Composable get() = painterResource(Res.drawable.app_logo_v2)
+
+    @Composable
+    private fun themed(line: DrawableResource, fill: DrawableResource): Painter =
+        painterResource(if (isSystemInDarkTheme()) fill else line)
 
     val Search: ImageVector = line("Search") {
         stroke {
@@ -134,37 +122,6 @@ object AppIcons {
         stroke(width = 2.4f) {
             moveTo(12f, 5f); verticalLineTo(19f)
             moveTo(5f, 12f); horizontalLineTo(19f)
-        }
-    }
-
-    val Close: ImageVector = line("Close") {
-        stroke(width = 2.2f) {
-            moveTo(6f, 6f); lineTo(18f, 18f)
-            moveTo(18f, 6f); lineTo(6f, 18f)
-        }
-    }
-
-    val Help: ImageVector = line("Help") {
-        stroke {
-            moveTo(12f, 3f); arcTo(9f, 9f, 0f, true, true, 12f, 21f); arcTo(9f, 9f, 0f, true, true, 12f, 3f); close()
-            moveTo(9.5f, 9.5f); curveTo(9.5f, 8f, 10.5f, 7f, 12f, 7f); curveTo(13.5f, 7f, 14.5f, 8f, 14.5f, 9.5f); curveTo(14.5f, 11f, 12f, 11.5f, 12f, 13.5f)
-        }
-        fill {
-            moveTo(12f, 16f); arcTo(0.9f, 0.9f, 0f, true, true, 12f, 17.8f); arcTo(0.9f, 0.9f, 0f, true, true, 12f, 16f); close()
-        }
-    }
-
-    val Settings: ImageVector = line("Settings") {
-        stroke {
-            moveTo(12f, 8.5f); arcTo(3.5f, 3.5f, 0f, true, true, 12f, 15.5f); arcTo(3.5f, 3.5f, 0f, true, true, 12f, 8.5f); close()
-            moveTo(12f, 3f); verticalLineTo(5f)
-            moveTo(12f, 19f); verticalLineTo(21f)
-            moveTo(3f, 12f); horizontalLineTo(5f)
-            moveTo(19f, 12f); horizontalLineTo(21f)
-            moveTo(5.6f, 5.6f); lineTo(7f, 7f)
-            moveTo(17f, 17f); lineTo(18.4f, 18.4f)
-            moveTo(5.6f, 18.4f); lineTo(7f, 17f)
-            moveTo(17f, 7f); lineTo(18.4f, 5.6f)
         }
     }
 
@@ -185,23 +142,6 @@ object AppIcons {
         stroke {
             moveTo(12f, 5f); lineTo(12f, 19f)
             moveTo(6f, 13f); lineTo(12f, 19f); lineTo(18f, 13f)
-        }
-    }
-
-    // TODO: replace this hand-rolled placeholder with the final design-system
-    //  refresh glyph once the asset lands. Drawn here only so the Settings
-    //  refresh button has a recognisable shape.
-    val Refresh: ImageVector = line("Refresh") {
-        stroke {
-            // Three-quarter arc of a circle from (12, 4) clockwise around to
-            // the bottom-left, leaving the gap in the upper-right where the
-            // arrowhead sits.
-            moveTo(12f, 4f)
-            arcTo(8f, 8f, 0f, isMoreThanHalf = true, isPositiveArc = false, 4.5f, 14f)
-            // Arrowhead: chevron pointing up-right at the gap, indicating
-            // "rotate clockwise" / refresh.
-            moveTo(12f, 4f); lineTo(15.5f, 4f)
-            moveTo(12f, 4f); lineTo(12f, 7.5f)
         }
     }
 }

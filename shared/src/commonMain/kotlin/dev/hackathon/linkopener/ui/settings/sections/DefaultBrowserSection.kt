@@ -40,7 +40,7 @@ internal fun DefaultBrowserSection(
     canOpenSettings: Boolean,
     onOpenSettings: () -> Unit,
 ) {
-    SectionPane(stringResource(Res.string.section_default_browser), AppIcons.BrowserUpdated) {
+    SectionPane(stringResource(Res.string.section_default_browser), AppIcons.DefaultBrowser) {
         SectionCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusDot(isPositive = isDefault)

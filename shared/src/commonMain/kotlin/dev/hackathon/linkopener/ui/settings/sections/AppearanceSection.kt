@@ -24,7 +24,7 @@ internal fun AppearanceSection(
     current: AppTheme,
     onSelected: (AppTheme) -> Unit,
 ) {
-    SectionPane(stringResource(Res.string.section_appearance), AppIcons.Palette) {
+    SectionPane(stringResource(Res.string.section_appearance), AppIcons.Appearance) {
         SectionCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -16,6 +16,7 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
 import dev.hackathon.linkopener.app.DebugFlags
 import dev.hackathon.linkopener.core.model.AppSettings
+import dev.hackathon.linkopener.ui.icons.AppIcons
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
 import dev.hackathon.linkopener.ui.settings.SettingsViewModel
@@ -67,8 +68,11 @@ private fun ApplicationScope.TrayHostBody(
     appVersion: String,
     onExit: () -> Unit,
 ) {
-    val trayIconPainter = remember { loadTrayIconPainter() }
-    val appIconPainter = remember { loadAppIconPainter() }
+    // Tray + window-decoration icon both use the SVG-backed full-color logo.
+    // Skia rasterizes the vector at the OS-requested size, so no manual
+    // pre-scale is needed (the previous PNG path went through AWT's
+    // nearest-neighbor downscale and crunched fine line art).
+    val appIconPainter = AppIcons.AppLogoV2
 
     val pickerState by container.pickerCoordinator.state.collectAsState()
 
@@ -94,7 +98,7 @@ private fun ApplicationScope.TrayHostBody(
     val appName = stringResource(Res.string.app_name)
 
     Tray(
-        icon = trayIconPainter,
+        icon = appIconPainter,
         tooltip = appName,
         menu = {
             Item(
@@ -145,7 +149,6 @@ private fun ApplicationScope.TrayHostBody(
                     viewModel = settingsViewModel,
                     appVersion = appVersion,
                     currentOs = container.currentOs,
-                    appIconPainter = appIconPainter,
                     onCloseRequest = { settingsAnchor = null },
                     onAddBrowserClick = {
                         // Native macOS file picker via AWT — bundles like .app
