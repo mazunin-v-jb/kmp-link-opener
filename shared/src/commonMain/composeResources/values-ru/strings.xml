@@ -52,7 +52,6 @@
     <string name="configure">Настроить</string>
     <string name="tray_menu_settings">Настройки</string>
     <string name="tray_menu_quit">Выход</string>
-    <string name="tray_menu_test_picker">Тест picker\'а (dev)</string>
     <string name="tray_window_settings_suffix">" — Настройки"</string>
 
     <!-- Default-browser banner + section -->

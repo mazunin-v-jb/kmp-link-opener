@@ -81,7 +81,7 @@ The `linkopener.debug` system property toggles development conveniences. Set `-D
 
 What it currently gates:
 - **Startup discovery dump.** `AppContainer` does a warm-up `DiscoverBrowsersUseCase()` so the picker is instant on first invocation; the result is cached in `BrowserRepositoryImpl`. With debug on, the dump (`Discovered N browser(s): …`) prints to stdout. Errors surface to stderr regardless.
-- **"Test picker (dev)" tray menu item.** Spawns the picker against `https://example.com/?utm=picker-test` so the picker chain can be exercised without packaging + registering the app as default browser. Hidden in non-debug builds (TD-7).
+- **`RuleEngine` match tracing.** When debug is on, the rules engine prints which rule matched (or "no rule matched") for each incoming URL so the picker chain is easier to debug.
 
 Three ways to set the flag:
 

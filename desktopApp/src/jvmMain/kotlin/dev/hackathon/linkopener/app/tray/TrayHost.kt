@@ -9,12 +9,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
-import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
-import dev.hackathon.linkopener.app.DebugFlags
 import dev.hackathon.linkopener.core.model.AppSettings
 import dev.hackathon.linkopener.ui.icons.AppIcons
 import dev.hackathon.linkopener.ui.picker.PickerState
@@ -31,7 +29,6 @@ import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.app_name
 import kmp_link_opener.shared.generated.resources.tray_menu_quit
 import kmp_link_opener.shared.generated.resources.tray_menu_settings
-import kmp_link_opener.shared.generated.resources.tray_menu_test_picker
 import kmp_link_opener.shared.generated.resources.tray_window_settings_suffix
 import org.jetbrains.compose.resources.stringResource
 
@@ -96,26 +93,18 @@ private fun ApplicationScope.TrayHostBody(
     }
 
     val appName = stringResource(Res.string.app_name)
+    val settingsLabel = stringResource(Res.string.tray_menu_settings)
+    val quitLabel = stringResource(Res.string.tray_menu_quit)
 
-    Tray(
-        icon = appIconPainter,
+    NativeTray(
+        iconPainter = appIconPainter,
         tooltip = appName,
-        menu = {
-            Item(
-                stringResource(Res.string.tray_menu_settings),
-                onClick = { settingsAnchor = currentCursorPosition() },
-            )
-            // Dev-only "Test picker" — gated on the same DebugFlags.enabled
-            // toggle as the startup discovery dump. Stamped public builds get
-            // launched without the flag and never see this entry.
-            if (DebugFlags.enabled) {
-                Item(
-                    stringResource(Res.string.tray_menu_test_picker),
-                    onClick = { container.pickerCoordinator.handleIncomingUrl("https://example.com/?utm=picker-test") },
-                )
-            }
-            Item(stringResource(Res.string.tray_menu_quit), onClick = onExit)
-        },
+        hostOs = container.currentOs,
+        onLeftClick = { settingsAnchor = currentCursorPosition() },
+        menuItems = listOf(
+            TrayMenuItem(settingsLabel) { settingsAnchor = currentCursorPosition() },
+            TrayMenuItem(quitLabel, onExit),
+        ),
     )
 
     val currentPickerState = pickerState

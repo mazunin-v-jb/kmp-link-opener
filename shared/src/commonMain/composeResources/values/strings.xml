@@ -60,7 +60,6 @@
     <string name="configure">Configure</string>
     <string name="tray_menu_settings">Settings</string>
     <string name="tray_menu_quit">Quit</string>
-    <string name="tray_menu_test_picker">Test picker (dev)</string>
     <string name="tray_window_settings_suffix">" — Settings"</string>
 
     <!-- Default-browser banner + section -->
