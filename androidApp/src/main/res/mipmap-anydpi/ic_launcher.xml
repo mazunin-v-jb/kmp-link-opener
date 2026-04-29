@@ -2,4 +2,15 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <!-- Without <monochrome>, Android 13+ "Themed icons" and especially
+         Android 16 QPR2's forced auto-themed icons (since 2025-12) generate
+         their own monochrome from foreground+background which inverts our
+         dark-grayscale-on-transparent logo against a light pastel bg into
+         a visually-inverted result on dark wallpapers. The monochrome
+         layer is alpha-only — system flattens to a single tint, only the
+         silhouette matters — so reusing the existing foreground PNG (already
+         dark-on-transparent, the dark fill becomes a clean silhouette mask)
+         produces the right tonal-tinted icon. The element is silently
+         ignored on API < 33, so no compat hazard. -->
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
 </adaptive-icon>
