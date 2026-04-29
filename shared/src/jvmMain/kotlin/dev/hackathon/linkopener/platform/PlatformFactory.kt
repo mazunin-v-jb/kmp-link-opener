@@ -9,7 +9,11 @@ import dev.hackathon.linkopener.platform.macos.MacOsBrowserIconLoader
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserMetadataExtractor
 import dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService
 import dev.hackathon.linkopener.platform.macos.MacOsLinkLauncher
+import dev.hackathon.linkopener.platform.windows.WindowsAutoStartManager
+import dev.hackathon.linkopener.platform.windows.WindowsBrowserDiscovery
+import dev.hackathon.linkopener.platform.windows.WindowsBrowserMetadataExtractor
 import dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService
+import dev.hackathon.linkopener.platform.windows.WindowsLinkLauncher
 
 object PlatformFactory {
 
@@ -17,14 +21,14 @@ object PlatformFactory {
 
     fun createAutoStartManager(): AutoStartManager = when (currentOs) {
         HostOs.MacOs -> MacOsAutoStartManager()
-        HostOs.Windows,
+        HostOs.Windows -> WindowsAutoStartManager()
         HostOs.Linux,
         HostOs.Other -> NoOpAutoStartManager()
     }
 
     fun createBrowserDiscovery(): BrowserDiscovery = when (currentOs) {
         HostOs.MacOs -> MacOsBrowserDiscovery()
-        HostOs.Windows,
+        HostOs.Windows -> WindowsBrowserDiscovery()
         HostOs.Linux,
         HostOs.Other -> EmptyBrowserDiscovery(System.getProperty("os.name").orEmpty())
     }
@@ -40,17 +44,16 @@ object PlatformFactory {
 
     fun createLinkLauncher(): LinkLauncher = when (currentOs) {
         HostOs.MacOs -> MacOsLinkLauncher()
-        // Windows / Linux launchers are stages 7 / 8 — they need a real
-        // applicationPath from per-OS discovery first. Until then, fall back
-        // to printing so the picker UI still works end-to-end in dev.
-        HostOs.Windows,
+        HostOs.Windows -> WindowsLinkLauncher()
+        // Linux launcher is stage 8 — until then, print so the picker
+        // UI still works end-to-end in dev.
         HostOs.Linux,
         HostOs.Other -> PrintingLinkLauncher()
     }
 
     fun createBrowserMetadataExtractor(): BrowserMetadataExtractor = when (currentOs) {
         HostOs.MacOs -> MacOsBrowserMetadataExtractor()
-        HostOs.Windows,
+        HostOs.Windows -> WindowsBrowserMetadataExtractor()
         HostOs.Linux,
         HostOs.Other -> UnsupportedManualBrowserExtractor()
     }

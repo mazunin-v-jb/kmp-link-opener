@@ -72,6 +72,10 @@ kotlin {
 
         jvmMain.dependencies {
             implementation(libs.kotlinx.coroutines.swing)
+            // JNA — used on Windows to call shell32!SHChangeNotify after
+            // registering as URL handler so the Default Apps cache flushes.
+            // No-op load on macOS/Linux (we swallow the exception).
+            implementation(libs.jna)
         }
     }
 }
@@ -124,6 +128,10 @@ kover {
                     "dev.hackathon.linkopener.platform.macos.PlutilRunner*",
                     "dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager*",
                     "dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService*",
+                    // Stage 7 Windows: WindowsDefaultBrowserService.openSystemSettings
+                    // shells out (`cmd /c start ms-settings:defaultapps`) — same exclusion
+                    // pattern as MacOsDefaultBrowserService. All registry-reading and
+                    // argv-building logic IS unit-tested via captured fixtures.
                     "dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService*",
                 )
             }

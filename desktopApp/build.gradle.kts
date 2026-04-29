@@ -154,6 +154,95 @@ tasks.withType<JavaExec>().configureEach {
     jvmArgs(nativeAccessJvmArgs)
 }
 
+// --- Cross-platform Windows fat-JAR -----------------------------------------
+// Builds a single .jar with our code + Windows-targeted Skiko native libs
+// (DLL bundled inside `skiko-awt-runtime-windows-x64`) + every other runtime
+// dep. Runnable from any Windows host that has JDK 17+ on PATH:
+//
+//   java -jar link-opener-<ver>-windows-x64.jar
+//
+// Why this exists: jpackage / WiX (the path Compose Desktop's `packageMsi`
+// uses) can only run ON Windows — they don't cross-compile from macOS. A
+// fat-JAR is the realistic "build a Windows-runnable from a macOS host"
+// shape: trade off the lack of an installer for portability + JDK
+// dependency.
+//
+// macOS-specific code (MacOsAlwaysOnTopOverFullScreen's reflective
+// AWTAccessor lookup) is gated at runtime by an `isMacOs` check, so the
+// missing `--add-exports` JVM args on a vanilla Windows `java -jar`
+// invocation never actually fire — the class loads fine, the side
+// effects don't run.
+
+// Standalone configuration so we don't pollute jvmRuntimeClasspath with the
+// Windows Skiko jar (which would conflict with the macOS one for local
+// development). All deps re-declared explicitly here, with
+// `compose.desktop.windows_x64` substituted for `compose.desktop.currentOs`
+// — same library set, Windows native DLL instead of macOS dylib.
+val windowsUberRuntime: Configuration by configurations.creating
+
+dependencies {
+    windowsUberRuntime(project(":shared"))
+    windowsUberRuntime(compose.desktop.windows_x64)
+    windowsUberRuntime(libs.compose.material3)
+    windowsUberRuntime(libs.compose.resources)
+    windowsUberRuntime(libs.kotlinx.coroutines.swing)
+    windowsUberRuntime(libs.kotlinx.serialization.json)
+    windowsUberRuntime(libs.multiplatformSettings)
+    windowsUberRuntime(libs.jna)
+}
+
+tasks.register<Jar>("packageWindowsUberJar") {
+    group = "compose desktop"
+    description = "Builds a Windows-runnable fat-JAR (cross-compiled from any host)."
+    // Lazy zipTree references survive into execution time, which Gradle's
+    // configuration cache can't serialise. This is a one-shot packaging
+    // task (run on demand to produce a release artefact), not a hot-loop
+    // build step — opting out is the simpler fix.
+    notCompatibleWithConfigurationCache("Uses zipTree() over a resolved Configuration")
+    archiveBaseName.set("link-opener")
+    archiveClassifier.set("windows-x64")
+    archiveVersion.set(composePackageVersion)
+
+    manifest {
+        attributes["Main-Class"] = "dev.hackathon.linkopener.app.MainKt"
+        attributes["Implementation-Version"] = composePackageVersion
+    }
+
+    // Skip jar-signature artifacts (they invalidate when we re-pack) and
+    // module-info.class (multiple modules' module-info collide; we don't
+    // run as a named module anyway). Default deduplication strategy
+    // would error on conflicts.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude(
+        "META-INF/*.SF",
+        "META-INF/*.DSA",
+        "META-INF/*.RSA",
+        "META-INF/versions/*/module-info.class",
+        "module-info.class",
+    )
+
+    // Bundle this module's compiled classes (the desktopApp jar) AND the
+    // entire Windows-targeted runtime classpath. Each dep jar is unzipped
+    // into the fat-jar at config time — declaring `from(zipTree(...))`
+    // statically (one entry per dep) keeps Gradle's configuration cache
+    // happy (no Project references survive into execution time).
+    val jvmJarTask = tasks.named<Jar>("jvmJar")
+    dependsOn(jvmJarTask)
+    from(jvmJarTask.flatMap { it.archiveFile }.map { zipTree(it) })
+
+    // Resolve the Windows runtime classpath now (config time) and add a
+    // separate `from(zipTree(...))` for each dep jar. `windowsUberRuntime`
+    // pulls `compose.desktop.windows_x64` so Skiko's Windows DLL is in
+    // the resulting fat-jar instead of the host's macOS dylib.
+    windowsUberRuntime.resolve().forEach { file ->
+        if (file.isDirectory) {
+            from(file)
+        } else if (file.name.endsWith(".jar")) {
+            from(zipTree(file))
+        }
+    }
+}
+
 if (notarizationProfile != null) {
     val dmgFile = layout.buildDirectory.file(
         "compose/binaries/main/dmg/$composePackageName-$composePackageVersion.dmg",

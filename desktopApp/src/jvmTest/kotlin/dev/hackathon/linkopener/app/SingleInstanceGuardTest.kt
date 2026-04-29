@@ -46,7 +46,7 @@ class SingleInstanceGuardTest {
         val activated = CountDownLatch(1)
         val primary = SingleInstanceGuard.acquireOrSignal(tempDir)
         assertNotNull(primary)
-        primary.onActivationRequest = { activated.countDown() }
+        primary.onActivationRequest = { _ -> activated.countDown() }
         try {
             val secondary = SingleInstanceGuard.acquireOrSignal(tempDir)
             assertNull(secondary, "second acquire while first is held must fail")
@@ -54,6 +54,36 @@ class SingleInstanceGuardTest {
                 activated.await(2, TimeUnit.SECONDS),
                 "primary should receive activation ping from the secondary within 2s",
             )
+        } finally {
+            primary.release()
+        }
+    }
+
+    @Test
+    fun secondaryForwardsUrlPayloadToPrimary() {
+        // W6: a secondary spawned by Windows' URL handler passes the
+        // URL via the activation socket; the primary's callback receives
+        // it as the String argument. Bare activation pings still arrive
+        // with `url == null`.
+        val received = java.util.concurrent.atomic.AtomicReference<String?>(null)
+        val activated = CountDownLatch(1)
+        val primary = SingleInstanceGuard.acquireOrSignal(tempDir)
+        assertNotNull(primary)
+        primary.onActivationRequest = { url ->
+            received.set(url)
+            activated.countDown()
+        }
+        try {
+            val secondary = SingleInstanceGuard.acquireOrSignal(
+                tempDir,
+                urlPayload = "https://example.com/page",
+            )
+            assertNull(secondary)
+            assertTrue(
+                activated.await(2, TimeUnit.SECONDS),
+                "primary should receive ping with URL payload within 2s",
+            )
+            kotlin.test.assertEquals("https://example.com/page", received.get())
         } finally {
             primary.release()
         }
