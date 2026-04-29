@@ -64,12 +64,24 @@ class RegistryReader(
      * empty.
      */
     suspend fun queryValue(path: String, name: String = ""): String? = withContext(Dispatchers.IO) {
+        // `reg.exe` distinguishes the default (unnamed) value from named
+        // ones at the argv level: `/ve` queries the default, `/v <name>`
+        // queries a named value. Passing `/v "(Default)"` (the literal
+        // string) makes reg.exe look for a value LITERALLY named
+        // "(Default)" — which never exists; the default value is
+        // actually unnamed. The output formats are identical (both
+        // print the data line as `(Default)    REG_SZ    <data>`), so
+        // the parser doesn't need to change.
         val args = buildList {
             add("reg")
             add("query")
             add(path)
-            add("/v")
-            add(name.ifEmpty { "(Default)" })
+            if (name.isEmpty()) {
+                add("/ve")
+            } else {
+                add("/v")
+                add(name)
+            }
         }
         val output = runner(args) ?: return@withContext null
         parseSingleValue(output, name)
@@ -118,11 +130,16 @@ class RegistryReader(
 
         /**
          * Lists immediate sub-key names directly under [parentPath].
-         * `reg query <parent>` prints each child as a fully-qualified
-         * line; we strip the parent prefix and skip blanks.
+         *
+         * reg.exe accepts hive aliases (`HKLM`, `HKCU`, …) in input but
+         * normalises its OUTPUT to the full form (`HKEY_LOCAL_MACHINE`,
+         * `HKEY_CURRENT_USER`, …). So if the caller passes the short
+         * form, we have to expand it before matching the prefix in the
+         * output — otherwise no lines match and the sub-key list comes
+         * back empty.
          */
         fun parseSubKeys(output: String, parentPath: String): List<String> {
-            val prefix = "$parentPath\\"
+            val prefix = expandHive(parentPath) + "\\"
             return output.lineSequence()
                 .map { it.trim() }
                 .filter { it.startsWith(prefix) && it.length > prefix.length }
@@ -131,6 +148,28 @@ class RegistryReader(
                 .map { it.substring(prefix.length) }
                 .filter { '\\' !in it }
                 .toList()
+        }
+
+        /**
+         * Expands a registry path's leading hive alias to its full form.
+         * `HKLM\…` → `HKEY_LOCAL_MACHINE\…`, etc. Already-full paths are
+         * returned unchanged. Used by [parseSubKeys] to match reg.exe's
+         * output normalisation.
+         */
+        internal fun expandHive(path: String): String {
+            val mapping = listOf(
+                "HKLM\\" to "HKEY_LOCAL_MACHINE\\",
+                "HKCU\\" to "HKEY_CURRENT_USER\\",
+                "HKCR\\" to "HKEY_CLASSES_ROOT\\",
+                "HKU\\" to "HKEY_USERS\\",
+                "HKCC\\" to "HKEY_CURRENT_CONFIG\\",
+            )
+            for ((short, full) in mapping) {
+                if (path.startsWith(short, ignoreCase = true)) {
+                    return full + path.substring(short.length)
+                }
+            }
+            return path
         }
 
         /**

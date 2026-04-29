@@ -178,9 +178,14 @@ class WindowsBrowserDiscoveryTest {
         private val outputs = mutableMapOf<List<String>, String>()
 
         fun withSubKeys(parentPath: String, subKeys: List<String>): ScriptedRegistry = apply {
+            // Real reg.exe normalises input hive aliases (HKLM / HKCU /
+            // …) to the full HKEY_… form in its output. Mirror that
+            // behaviour in the fake so the parser exercises its
+            // expansion logic the way it does in production.
+            val expanded = RegistryReader.expandHive(parentPath)
             val body = buildString {
-                append(parentPath).append('\n').append('\n')
-                subKeys.forEach { append(parentPath).append('\\').append(it).append('\n') }
+                append(expanded).append('\n').append('\n')
+                subKeys.forEach { append(expanded).append('\\').append(it).append('\n') }
             }
             outputs[listOf("reg", "query", parentPath)] = body
         }
@@ -188,7 +193,9 @@ class WindowsBrowserDiscoveryTest {
         fun withCommand(parentPath: String, rawCommand: String): ScriptedRegistry = apply {
             val cmdPath = "$parentPath\\shell\\open\\command"
             val body = "$cmdPath\n    (Default)    REG_SZ    $rawCommand\n"
-            outputs[listOf("reg", "query", cmdPath, "/v", "(Default)")] = body
+            // `/ve` queries the default (unnamed) value — see RegistryReader
+            // docs for why `/v "(Default)"` doesn't work.
+            outputs[listOf("reg", "query", cmdPath, "/ve")] = body
         }
 
         fun withCapabilitiesName(parentPath: String, applicationName: String): ScriptedRegistry = apply {

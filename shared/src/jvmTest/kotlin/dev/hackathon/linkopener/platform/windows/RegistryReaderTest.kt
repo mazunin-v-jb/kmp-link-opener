@@ -1,5 +1,6 @@
 package dev.hackathon.linkopener.platform.windows
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -53,6 +54,52 @@ class RegistryReaderTest {
     @Test
     fun parseSubKeysReturnsEmptyOnEmptyOutput() {
         assertEquals(emptyList(), RegistryReader.parseSubKeys("", "HKLM\\Anything"))
+    }
+
+    @Test
+    fun parseSubKeysExpandsHkmAliasInParentPath() {
+        // Regression: reg.exe normalises input `HKLM\…` to `HKEY_LOCAL_MACHINE\…`
+        // in its output. Caller can pass the short alias; the parser has
+        // to expand it before matching.
+        val output = """
+            HKEY_LOCAL_MACHINE\SOFTWARE\Clients\StartMenuInternet
+            HKEY_LOCAL_MACHINE\SOFTWARE\Clients\StartMenuInternet\Google Chrome
+            HKEY_LOCAL_MACHINE\SOFTWARE\Clients\StartMenuInternet\Mozilla Firefox
+        """.trimIndent()
+
+        val keys = RegistryReader.parseSubKeys(
+            output,
+            "HKLM\\SOFTWARE\\Clients\\StartMenuInternet",
+        )
+
+        assertEquals(listOf("Google Chrome", "Mozilla Firefox"), keys)
+    }
+
+    @Test
+    fun expandHiveCoversAllStandardAliases() {
+        // Single source of truth for the alias table — adding a new
+        // hive should fail this test until it's wired into expandHive.
+        assertEquals(
+            "HKEY_LOCAL_MACHINE\\Foo",
+            RegistryReader.expandHive("HKLM\\Foo"),
+        )
+        assertEquals(
+            "HKEY_CURRENT_USER\\Foo",
+            RegistryReader.expandHive("HKCU\\Foo"),
+        )
+        assertEquals(
+            "HKEY_CLASSES_ROOT\\Foo",
+            RegistryReader.expandHive("HKCR\\Foo"),
+        )
+        assertEquals(
+            "HKEY_USERS\\Foo",
+            RegistryReader.expandHive("HKU\\Foo"),
+        )
+        // Already-full paths pass through unchanged.
+        assertEquals(
+            "HKEY_LOCAL_MACHINE\\Foo",
+            RegistryReader.expandHive("HKEY_LOCAL_MACHINE\\Foo"),
+        )
     }
 
     @Test
@@ -140,6 +187,38 @@ class RegistryReaderTest {
         """.trimIndent()
 
         assertEquals("Bar", RegistryReader.parseSingleValue(output, "Name"))
+    }
+
+    @Test
+    fun queryValueWithEmptyNameUsesVeFlagNotLiteralDefault() = runTest {
+        // Regression: previously we passed `/v "(Default)"` for default-
+        // value reads, which makes reg.exe search for a value LITERALLY
+        // named "(Default)" — that value never exists, so every default
+        // read failed silently. The fix is to use `/ve` instead. This
+        // test captures the argv shape so a future refactor can't
+        // re-introduce the bug.
+        val capturedArgs = mutableListOf<List<String>>()
+        val reader = RegistryReader(runner = { args ->
+            capturedArgs += args
+            null
+        })
+
+        reader.queryValue("HKLM\\Foo")
+
+        assertEquals(listOf("reg", "query", "HKLM\\Foo", "/ve"), capturedArgs.single())
+    }
+
+    @Test
+    fun queryValueWithExplicitNameUsesV() = runTest {
+        val capturedArgs = mutableListOf<List<String>>()
+        val reader = RegistryReader(runner = { args ->
+            capturedArgs += args
+            null
+        })
+
+        reader.queryValue("HKLM\\Foo", "ProgId")
+
+        assertEquals(listOf("reg", "query", "HKLM\\Foo", "/v", "ProgId"), capturedArgs.single())
     }
 
     @Test
