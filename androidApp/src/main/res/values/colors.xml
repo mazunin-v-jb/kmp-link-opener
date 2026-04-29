@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Adaptive-icon background. White matches the foreground PNG (which
-         is grayscale-with-alpha, so it works on any background); the
-         system-applied mask shape (circle / squircle / depending on
-         launcher) crops to a clean white-bordered logo. -->
-    <color name="ic_launcher_background">#FFFFFFFF</color>
+    <!-- Adaptive-icon background — Material Blue 50, a light pastel hint
+         of brand-blue. The foreground PNG is dark grayscale-on-transparent
+         (8-bit gray+alpha), so the background must be light enough that
+         the logo reads clearly. Pure white works but reads boring; this
+         pale blue gives a slight branded feel without losing contrast.
+         If the source PNG is ever switched to white-on-transparent, swap
+         this to a deeper primary (#003178). -->
+    <color name="ic_launcher_background">#FFE3F2FD</color>
 </resources>

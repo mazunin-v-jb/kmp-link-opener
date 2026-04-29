@@ -70,5 +70,8 @@ private fun trayPixelSize(hostOs: HostOs): Int = when (hostOs) {
     HostOs.MacOs -> MAC_OS_TRAY_PIXEL_SIZE
     HostOs.Linux -> LINUX_TRAY_PIXEL_SIZE
     HostOs.Windows -> WINDOWS_TRAY_PIXEL_SIZE
+    // Android branch is unreachable here (the desktop tray code never runs
+    // on Android), but Kotlin requires exhaustive `when` over enums.
+    HostOs.Android,
     HostOs.Other -> FALLBACK_TRAY_PIXEL_SIZE
 }

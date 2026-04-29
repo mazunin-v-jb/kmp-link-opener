@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher entry name. Localised counterpart in values-ru/. The
+         in-app strings (Settings, picker) come from Compose Resources
+         in :shared; this resource is only the manifest-time label
+         shown on the launcher / system-wide app picker. -->
+    <string name="app_name">Link Opener</string>
+</resources>

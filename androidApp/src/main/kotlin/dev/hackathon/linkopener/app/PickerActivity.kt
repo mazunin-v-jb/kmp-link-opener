@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.hackathon.linkopener.platform.android.extractUrlFromIntentParts
 import dev.hackathon.linkopener.ui.picker.BrowserPickerScreen
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
@@ -113,7 +114,11 @@ class PickerActivity : ComponentActivity() {
     }
 
     private fun forwardIntent(intent: Intent?) {
-        val url = extractUrl(intent)
+        val url = extractUrlFromIntentParts(
+            action = intent?.action,
+            dataString = intent?.dataString?.let(::unwrapIntentScheme),
+            extraText = intent?.getStringExtra(Intent.EXTRA_TEXT),
+        )
         if (url == null) {
             // Defensive: if PickerActivity gets started without a usable
             // URL we just bail. Better than leaving a transparent shell
@@ -125,32 +130,17 @@ class PickerActivity : ComponentActivity() {
     }
 
     /**
-     * Pulls a URL out of either an `ACTION_VIEW http(s)://…` intent (the
-     * standard browser entry) or an `ACTION_SEND text/plain` intent
-     * (Android share sheets). Returns null if neither shape carries a
-     * usable URL.
+     * Some apps construct deep-link entries as
+     * `intent://example.com/path#Intent;scheme=https;…;end` — Android's
+     * intent-uri spec. The manifest catches them via the `intent` scheme
+     * filter; here we parse out the underlying URI so the picker sees a
+     * normal http(s) URL. Failure / non-intent strings pass through
+     * unchanged.
      */
-    private fun extractUrl(intent: Intent?): String? {
-        if (intent == null) return null
-        // ACTION_VIEW carries the URL as the intent data. The manifest
-        // intent-filter restricts to http/https schemes, so dataString is
-        // either a full URL or null.
-        intent.dataString?.let { return it }
-        // ACTION_SEND: EXTRA_TEXT can be a bare URL or arbitrary text
-        // containing one. Pick the first http/https token if any — that's
-        // typically how share sheets format "Share link" payloads.
-        if (intent.action == Intent.ACTION_SEND) {
-            val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
-            return URL_PATTERN.find(text)?.value
-        }
-        return null
-    }
-
-    private companion object {
-        // Loose URL match: scheme + host with at least one dot, optional
-        // path/query. Greedy stops at whitespace. Good enough for typical
-        // share-sheet payloads ("Look at this: https://example.com/foo");
-        // not RFC 3986.
-        private val URL_PATTERN = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
+    private fun unwrapIntentScheme(s: String): String {
+        if (!s.startsWith("intent:", ignoreCase = true)) return s
+        return runCatching {
+            Intent.parseUri(s, Intent.URI_INTENT_SCHEME).dataString
+        }.getOrNull() ?: s
     }
 }

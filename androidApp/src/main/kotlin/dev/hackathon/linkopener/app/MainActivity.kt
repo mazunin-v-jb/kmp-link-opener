@@ -22,9 +22,20 @@ import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
  */
 class MainActivity : ComponentActivity() {
 
+    private val container by lazy { (application as LinkOpenerApplication).container }
+
+    override fun onResume() {
+        super.onResume()
+        // Returning from RoleManager dialog / Default Apps page → re-read
+        // the system default-browser binding so the Settings banner
+        // updates without an app restart. Cheap (single PackageManager
+        // call) so we don't gate it on whether the user actually went
+        // to the dialog.
+        container.recheckDefaultBrowser()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val container = (application as LinkOpenerApplication).container
         val appVersion = container.getAppInfoUseCase().version
 
         setContent {
@@ -35,11 +46,7 @@ class MainActivity : ComponentActivity() {
                 SettingsScreen(
                     viewModel = viewModel,
                     appVersion = appVersion,
-                    // HostOs has no Android arm — Other reads as
-                    // "no per-OS special casing"; SettingsScreen uses
-                    // it to decide tray-launch wording on macOS, which
-                    // doesn't apply here.
-                    currentOs = HostOs.Other,
+                    currentOs = HostOs.Android,
                     onCloseRequest = { finish() },
                 )
             }

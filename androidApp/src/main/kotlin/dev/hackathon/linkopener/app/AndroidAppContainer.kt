@@ -67,9 +67,23 @@ class AndroidAppContainer(context: Context) {
     private val autoStartManager = NoOpAutoStartManager()
     private val browserDiscovery = AndroidBrowserDiscovery(appContext, ownPackageName)
     val urlReceiver: AndroidUrlReceiver = AndroidUrlReceiver()
-    private val defaultBrowserService =
+    // Concrete reference held so we can call forceRecheck() — the
+    // base interface (DefaultBrowserService) doesn't expose it.
+    private val androidDefaultBrowserService =
         AndroidDefaultBrowserService(appContext, ownPackageName)
+    private val defaultBrowserService = androidDefaultBrowserService
     private val linkLauncher = AndroidLinkLauncher(appContext)
+
+    /**
+     * Force-emits a fresh `isDefaultBrowser()` reading on the
+     * `observeIsDefaultBrowser()` flow that `SettingsViewModel` is
+     * subscribed to. `MainActivity.onResume` calls this so the
+     * "Set as default" banner updates immediately after the user
+     * returns from the system dialog / Default Apps page.
+     */
+    fun recheckDefaultBrowser() {
+        androidDefaultBrowserService.forceRecheck()
+    }
     private val browserMetadataExtractor = UnsupportedManualBrowserExtractor("Android")
     private val browserIconLoader = AndroidBrowserIconLoader(appContext)
 

@@ -23,6 +23,7 @@ object PlatformFactory {
         HostOs.MacOs -> MacOsAutoStartManager()
         HostOs.Windows -> WindowsAutoStartManager()
         HostOs.Linux,
+        HostOs.Android,
         HostOs.Other -> NoOpAutoStartManager()
     }
 
@@ -30,6 +31,7 @@ object PlatformFactory {
         HostOs.MacOs -> MacOsBrowserDiscovery()
         HostOs.Windows -> WindowsBrowserDiscovery()
         HostOs.Linux,
+        HostOs.Android,
         HostOs.Other -> EmptyBrowserDiscovery(System.getProperty("os.name").orEmpty())
     }
 
@@ -39,6 +41,7 @@ object PlatformFactory {
         HostOs.MacOs -> MacOsDefaultBrowserService(ownBundleId = ownBundleId)
         HostOs.Windows -> WindowsDefaultBrowserService()
         HostOs.Linux,
+        HostOs.Android,
         HostOs.Other -> LinuxDefaultBrowserService()
     }
 
@@ -48,6 +51,7 @@ object PlatformFactory {
         // Linux launcher is stage 8 — until then, print so the picker
         // UI still works end-to-end in dev.
         HostOs.Linux,
+        HostOs.Android,
         HostOs.Other -> PrintingLinkLauncher()
     }
 
@@ -55,6 +59,7 @@ object PlatformFactory {
         HostOs.MacOs -> MacOsBrowserMetadataExtractor()
         HostOs.Windows -> WindowsBrowserMetadataExtractor()
         HostOs.Linux,
+        HostOs.Android,
         HostOs.Other -> UnsupportedManualBrowserExtractor(System.getProperty("os.name").orEmpty())
     }
 
@@ -74,6 +79,7 @@ object PlatformFactory {
         // hand us the right `applicationPath` (the .desktop file) — until
         // then this just sits ready.
         HostOs.Linux -> LinuxBrowserIconLoader()
+        HostOs.Android,
         HostOs.Other -> NoOpBrowserIconLoader()
     }
 

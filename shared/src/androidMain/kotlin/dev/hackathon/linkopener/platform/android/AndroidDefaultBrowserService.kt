@@ -8,6 +8,9 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import dev.hackathon.linkopener.platform.DefaultBrowserService
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 /**
  * Detects whether *this* app is currently the default browser and deep-links
@@ -19,10 +22,12 @@ import dev.hackathon.linkopener.platform.DefaultBrowserService
  * (29+) is the "official" path but resolveActivity is equivalent and
  * version-portable. Falls back to false on any error.
  *
- * Live observation: not implemented for v1 — the default-emit-once base
- * behaviour from `DefaultBrowserService` is enough. We could poll on
- * Activity `onResume` later (the Settings page is a separate Activity, so
- * any change always returns through `onResume`).
+ * Live observation: a single `MutableStateFlow<Long>` increments on every
+ * [forceRecheck] call, and `observeIsDefaultBrowser` maps each tick to a
+ * fresh `isDefaultBrowser()` read. `MainActivity.onResume` calls
+ * [forceRecheck] so coming back from the RoleManager dialog (or the
+ * Default Apps settings page) re-evaluates the banner immediately. Cheap
+ * — `resolveActivity` is a single PackageManager hop.
  *
  * "Make default" prompt: on Android 10+ (API 29+) we use `RoleManager.
  * createRequestRoleIntent(ROLE_BROWSER)` which surfaces a system dialog
@@ -41,6 +46,25 @@ class AndroidDefaultBrowserService(
     private val ownPackageName: String = context.packageName,
     private val probeUrl: String = "http://example.com",
 ) : DefaultBrowserService {
+
+    // Bumped on every forceRecheck() call. The flow downstream maps each
+    // emission to a fresh isDefaultBrowser() read. MutableStateFlow's
+    // initial emission means subscribers also get the current value as
+    // soon as they collect.
+    private val recheckTicks = MutableStateFlow(0L)
+
+    /**
+     * Forces `observeIsDefaultBrowser` to emit a freshly-read value.
+     * `MainActivity` calls this from `onResume` so returning from the
+     * RoleManager dialog / Default Apps page updates the Settings banner
+     * without waiting for app restart.
+     */
+    fun forceRecheck() {
+        recheckTicks.value = recheckTicks.value + 1
+    }
+
+    override fun observeIsDefaultBrowser(): Flow<Boolean> =
+        recheckTicks.map { isDefaultBrowser() }
 
     override suspend fun isDefaultBrowser(): Boolean = runCatching {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(probeUrl))

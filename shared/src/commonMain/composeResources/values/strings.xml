@@ -112,4 +112,10 @@
     <string name="tooltip_help_easter">HALP!!</string>
     <string name="tooltip_close">Close settings without quitting Link Opener</string>
     <string name="tooltip_drag_to_reorder">Drag to reorder</string>
+
+    <string-array name="default_browser_instructions_android">
+        <item>Tap the button below — Android will show a system dialog asking if you want Link Opener as your default browser.</item>
+        <item>If the dialog doesn\'t appear (older Android), it will open Settings → Apps → Default apps instead.</item>
+        <item>Pick Link Opener under the "Browser app" entry.</item>
+    </string-array>
 </resources>

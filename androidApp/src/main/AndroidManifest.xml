@@ -19,7 +19,7 @@
 
     <application
         android:name=".LinkOpenerApplication"
-        android:label="Link Opener"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.LinkOpener">
@@ -45,13 +45,18 @@
             android:exported="true"
             android:launchMode="singleInstance"
             android:theme="@style/Theme.LinkOpener.Translucent">
-            <!-- Default browser entry: tapped link in any app. -->
+            <!-- Default browser entry: tapped link in any app. The
+                 `intent:` scheme catches `intent://…#Intent;…;end` URIs
+                 some apps construct as deep-link wrappers around an
+                 underlying http(s) URL — we unwrap them in
+                 PickerActivity.forwardIntent. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="http" />
                 <data android:scheme="https" />
+                <data android:scheme="intent" />
             </intent-filter>
             <!-- Share-sheet entry: "Share to → Link Opener" from any app
                  that fires ACTION_SEND text/plain. PickerActivity pulls
