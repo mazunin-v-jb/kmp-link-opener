@@ -9,6 +9,7 @@ import dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService
 import dev.hackathon.linkopener.platform.macos.MacOsLinkLauncher
 import dev.hackathon.linkopener.platform.windows.WindowsAutoStartManager
 import dev.hackathon.linkopener.platform.windows.WindowsBrowserDiscovery
+import dev.hackathon.linkopener.platform.windows.WindowsBrowserMetadataExtractor
 import dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService
 import dev.hackathon.linkopener.platform.windows.WindowsLinkLauncher
 
@@ -50,7 +51,7 @@ object PlatformFactory {
 
     fun createBrowserMetadataExtractor(): BrowserMetadataExtractor = when (currentOs) {
         HostOs.MacOs -> MacOsBrowserMetadataExtractor()
-        HostOs.Windows,
+        HostOs.Windows -> WindowsBrowserMetadataExtractor()
         HostOs.Linux,
         HostOs.Other -> UnsupportedManualBrowserExtractor()
     }
