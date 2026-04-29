@@ -1,9 +1,11 @@
 package dev.hackathon.linkopener.platform.android
 
+import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import dev.hackathon.linkopener.platform.DefaultBrowserService
 
@@ -22,10 +24,17 @@ import dev.hackathon.linkopener.platform.DefaultBrowserService
  * Activity `onResume` later (the Settings page is a separate Activity, so
  * any change always returns through `onResume`).
  *
- * Settings deep-link: `ACTION_MANAGE_DEFAULT_APPS_SETTINGS` opens the global
- * Default Apps page. Some OEM Android skins (Samsung One UI, Xiaomi MIUI)
- * land on a slightly different page; we accept that — there's no consistent
- * deeper deep-link.
+ * "Make default" prompt: on Android 10+ (API 29+) we use `RoleManager.
+ * createRequestRoleIntent(ROLE_BROWSER)` which surfaces a system dialog
+ * "Use Link Opener as default browser? Yes / No" — much better UX than
+ * dropping the user into the Settings tree. Pre-29 Android falls back to
+ * `ACTION_MANAGE_DEFAULT_APPS_SETTINGS` (still better than a generic
+ * settings root).
+ *
+ * Some OEM Android skins (Samsung One UI, Xiaomi MIUI) land on a slightly
+ * different settings page when the role-request flow isn't supported; we
+ * accept that — there's no consistent deeper deep-link below the
+ * RoleManager API.
  */
 class AndroidDefaultBrowserService(
     private val context: Context,
@@ -50,9 +59,27 @@ class AndroidDefaultBrowserService(
     override val canOpenSystemSettings: Boolean = true
 
     override suspend fun openSystemSettings(): Boolean = runCatching {
-        val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent = roleRequestIntent() ?: defaultAppsSettingsIntent()
         context.startActivity(intent)
         true
     }.getOrElse { false }
+
+    /**
+     * Returns an in-app role-request intent on API 29+ when the
+     * `ROLE_BROWSER` role is available, otherwise null. The role might be
+     * unavailable on locked-down builds (work profile, certain OEM skins);
+     * caller falls back to the generic settings page.
+     */
+    private fun roleRequestIntent(): Intent? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        val roleManager = context.getSystemService(Context.ROLE_SERVICE) as? RoleManager ?: return null
+        if (!roleManager.isRoleAvailable(RoleManager.ROLE_BROWSER)) return null
+        return roleManager
+            .createRequestRoleIntent(RoleManager.ROLE_BROWSER)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    private fun defaultAppsSettingsIntent(): Intent =
+        Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }

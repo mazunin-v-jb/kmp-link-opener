@@ -76,7 +76,17 @@ class AndroidDefaultBrowserServiceTest {
     }
 
     @Test
-    fun openSystemSettingsLaunchesManageDefaultAppsIntent() = runTest {
+    fun openSystemSettingsLaunchesAnIntent() = runTest {
+        // The exact intent action depends on API level / role availability:
+        //   * API 29+ with ROLE_BROWSER available  → RoleManager request
+        //     intent (action varies by Android version, package targets
+        //     the role controller).
+        //   * Anything else                        → ACTION_MANAGE_DEFAULT_APPS_SETTINGS.
+        // We don't pin the exact action — Robolectric's runtime version
+        // changes which path fires. Instead, assert the contract:
+        //   1. `openSystemSettings` reports success.
+        //   2. *Some* intent was dispatched.
+        //   3. FLAG_ACTIVITY_NEW_TASK is on it (required from a non-Activity Context).
         val service = AndroidDefaultBrowserService(application, application.packageName)
 
         val ok = service.openSystemSettings()
@@ -84,9 +94,6 @@ class AndroidDefaultBrowserServiceTest {
         assertTrue(ok)
         val started = shadowOf(application).nextStartedActivity
         assertNotNull(started)
-        assertEquals(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS, started.action)
-        // Started from a non-Activity Context, so FLAG_ACTIVITY_NEW_TASK
-        // must be set or the system would throw at runtime.
         assertTrue((started.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
     }
 

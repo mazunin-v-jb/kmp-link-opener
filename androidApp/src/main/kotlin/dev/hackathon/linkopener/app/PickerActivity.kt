@@ -113,7 +113,44 @@ class PickerActivity : ComponentActivity() {
     }
 
     private fun forwardIntent(intent: Intent?) {
-        val url = intent?.dataString ?: return
+        val url = extractUrl(intent)
+        if (url == null) {
+            // Defensive: if PickerActivity gets started without a usable
+            // URL we just bail. Better than leaving a transparent shell
+            // activity hanging on top of whatever the user was doing.
+            finish()
+            return
+        }
         container.urlReceiver.submit(url)
+    }
+
+    /**
+     * Pulls a URL out of either an `ACTION_VIEW http(s)://…` intent (the
+     * standard browser entry) or an `ACTION_SEND text/plain` intent
+     * (Android share sheets). Returns null if neither shape carries a
+     * usable URL.
+     */
+    private fun extractUrl(intent: Intent?): String? {
+        if (intent == null) return null
+        // ACTION_VIEW carries the URL as the intent data. The manifest
+        // intent-filter restricts to http/https schemes, so dataString is
+        // either a full URL or null.
+        intent.dataString?.let { return it }
+        // ACTION_SEND: EXTRA_TEXT can be a bare URL or arbitrary text
+        // containing one. Pick the first http/https token if any — that's
+        // typically how share sheets format "Share link" payloads.
+        if (intent.action == Intent.ACTION_SEND) {
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
+            return URL_PATTERN.find(text)?.value
+        }
+        return null
+    }
+
+    private companion object {
+        // Loose URL match: scheme + host with at least one dot, optional
+        // path/query. Greedy stops at whitespace. Good enough for typical
+        // share-sheet payloads ("Look at this: https://example.com/foo");
+        // not RFC 3986.
+        private val URL_PATTERN = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
     }
 }

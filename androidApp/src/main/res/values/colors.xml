@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive-icon background. White matches the foreground PNG (which
+         is grayscale-with-alpha, so it works on any background); the
+         system-applied mask shape (circle / squircle / depending on
+         launcher) crops to a clean white-bordered logo. -->
+    <color name="ic_launcher_background">#FFFFFFFF</color>
+</resources>
