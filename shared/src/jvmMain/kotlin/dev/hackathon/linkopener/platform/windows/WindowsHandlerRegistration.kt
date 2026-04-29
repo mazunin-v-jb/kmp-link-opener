@@ -1,5 +1,8 @@
 package dev.hackathon.linkopener.platform.windows
 
+import com.sun.jna.Library
+import com.sun.jna.Native
+import com.sun.jna.Pointer
 import dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService.Companion.OWN_PROG_ID
 
 /**
@@ -72,10 +75,15 @@ class WindowsHandlerRegistration(
 
         // 2. Capabilities — the StartMenuInternet sub-tree advertising
         // which URL schemes we handle. ApplicationName + ApplicationDescription
-        // + URLAssociations[http=ProgId, https=ProgId].
+        // + ApplicationIcon + URLAssociations[http=ProgId, https=ProgId].
         val caps = "HKCU\\SOFTWARE\\Clients\\StartMenuInternet\\$REGISTRATION_NAME\\Capabilities"
         val b1 = registry.setValue(caps, "ApplicationName", "Link Opener")
         val b2 = registry.setValue(caps, "ApplicationDescription", "Pick which browser opens each link")
+        // ApplicationIcon — Windows 11 filters out apps without an icon from
+        // the Default Apps search. Point at the launch executable's first
+        // resource (`,0`); for fat-JAR launches this resolves to java.exe's
+        // own icon, which is acceptable for now.
+        val bIcon = registry.setValue(caps, "ApplicationIcon", "${launchTokens.first()},0")
         val b3 = registry.setValue("$caps\\URLAssociations", "http", OWN_PROG_ID)
         val b4 = registry.setValue("$caps\\URLAssociations", "https", OWN_PROG_ID)
         // The parent key's (Default) value should match ApplicationName so the
@@ -102,7 +110,28 @@ class WindowsHandlerRegistration(
             "Software\\Clients\\StartMenuInternet\\$REGISTRATION_NAME\\Capabilities",
         )
 
-        return a1 && a2 && b1 && b2 && b3 && b4 && b5 && b6 && c1
+        val ok = a1 && a2 && b1 && b2 && bIcon && b3 && b4 && b5 && b6 && c1
+
+        // After writing the registry entries, tell the Windows shell to
+        // flush its association cache. Without this nudge, the Default Apps
+        // search on Win11 won't list us until the user logs out and back
+        // in. We do this *unconditionally* (even if some writes failed) so
+        // partial registration becomes visible too.
+        notifyAssociationsChanged()
+
+        return ok
+    }
+
+    /**
+     * Calls `SHChangeNotify(SHCNE_ASSOCCHANGED, 0, NULL, NULL)` to flush
+     * the shell's association cache. No-op on non-Windows hosts (the JNA
+     * load fails and we swallow it). Idempotent and safe to call any
+     * number of times.
+     */
+    private fun notifyAssociationsChanged() {
+        runCatching {
+            Shell32.INSTANCE.SHChangeNotify(SHCNE_ASSOCCHANGED, 0, Pointer.NULL, Pointer.NULL)
+        }
     }
 
     /**
@@ -125,5 +154,22 @@ class WindowsHandlerRegistration(
         // RegisteredApplications value name. Must match across all
         // three locations — Windows joins them by string equality.
         const val REGISTRATION_NAME = "LinkOpener"
+
+        // SHChangeNotify event flag for "file association changed".
+        // From shlobj_core.h: #define SHCNE_ASSOCCHANGED 0x08000000.
+        const val SHCNE_ASSOCCHANGED = 0x08000000L
+    }
+
+    /**
+     * Minimal JNA binding for `shell32!SHChangeNotify`. Loaded lazily on
+     * first call; on non-Windows hosts the load throws, which we swallow
+     * in [notifyAssociationsChanged].
+     */
+    private interface Shell32 : Library {
+        fun SHChangeNotify(wEventId: Long, uFlags: Int, dwItem1: Pointer?, dwItem2: Pointer?)
+
+        companion object {
+            val INSTANCE: Shell32 = Native.load("shell32", Shell32::class.java)
+        }
     }
 }

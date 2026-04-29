@@ -71,6 +71,10 @@ kotlin {
 
         jvmMain.dependencies {
             implementation(libs.kotlinx.coroutines.swing)
+            // JNA — used on Windows to call shell32!SHChangeNotify after
+            // registering as URL handler so the Default Apps cache flushes.
+            // No-op load on macOS/Linux (we swallow the exception).
+            implementation(libs.jna)
         }
     }
 }

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class WindowsHandlerRegistrationTest {
 
     @Test
-    fun registerWritesAllNineRegistryEntriesAndReturnsTrue() = runTest {
+    fun registerWritesAllRegistryEntriesAndReturnsTrue() = runTest {
         val recorder = RecordingRunner()
         val reg = WindowsHandlerRegistration(
             registry = RegistryReader(runner = recorder),
@@ -19,12 +19,32 @@ class WindowsHandlerRegistrationTest {
         val ok = reg.register()
 
         assertTrue(ok)
-        // Nine `reg add` calls — see WindowsHandlerRegistration for the list:
+        // Ten `reg add` calls — see WindowsHandlerRegistration for the list:
         // ProgId default, ProgId shell\open\command,
-        // Capabilities ApplicationName, ApplicationDescription, http, https,
+        // Capabilities ApplicationName, ApplicationDescription, ApplicationIcon, http, https,
         // StartMenuInternet (Default), StartMenuInternet shell\open\command,
         // RegisteredApplications LinkOpener.
-        assertEquals(9, recorder.calls.count { it[1] == "add" })
+        assertEquals(10, recorder.calls.count { it[1] == "add" })
+    }
+
+    @Test
+    fun registerWritesApplicationIconPointingAtLaunchExe() = runTest {
+        // Win11 Default Apps search filters out registrations without an
+        // icon. We point at the launch executable's index-0 resource —
+        // for fat-JAR builds this resolves to java.exe's own icon, which
+        // is acceptable until we bundle a proper packaged installer.
+        val recorder = RecordingRunner()
+        val reg = WindowsHandlerRegistration(
+            registry = RegistryReader(runner = recorder),
+            launchTokensProvider = { listOf("C:\\App\\LinkOpener.exe") },
+        )
+
+        reg.register()
+
+        val iconCall = recorder.calls.firstOrNull {
+            it[1] == "add" && it.contains("ApplicationIcon")
+        }
+        assertEquals("C:\\App\\LinkOpener.exe,0", iconCall?.let { it[it.indexOf("/d") + 1] })
     }
 
     @Test
