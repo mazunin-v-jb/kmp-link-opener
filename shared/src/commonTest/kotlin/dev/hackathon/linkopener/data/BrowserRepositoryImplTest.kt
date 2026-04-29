@@ -156,6 +156,28 @@ class BrowserRepositoryImplTest {
     }
 
     @Test
+    fun collapseGroupWithMultipleNonProfileEntriesPassesThrough() = runTest {
+        // Edge case: two installations of the same browser at the same path
+        // surfacing as separate Browser entries (shouldn't happen — discovery
+        // distinct-by-path — but the third arm of collapseProfilesIfDisabled
+        // exists as a defensive default and deserves coverage). With no
+        // profile field anywhere in the group, the policy passes the group
+        // through unchanged.
+        val sharedPath = "/Applications/Some.app"
+        val a = Browser("com.example.a", "Some", sharedPath, "1.0")
+        val b = Browser("com.example.b", "Some", sharedPath, "1.0")
+        val repo = BrowserRepositoryImpl(
+            CountingDiscovery(listOf(a, b)),
+            FakeSettings(initial = AppSettings(showBrowserProfiles = false)),
+        )
+
+        val result = repo.getInstalledBrowsers()
+
+        // Both entries kept (third `else` arm of the when).
+        assertEquals(listOf(a, b), result)
+    }
+
+    @Test
     fun showBrowserProfilesFalseDoesNotTouchSingleProfileBrowsers() = runTest {
         // Browser without a profile (single-profile Chromium / Safari / manual)
         // pass through untouched whether toggle is on or off.

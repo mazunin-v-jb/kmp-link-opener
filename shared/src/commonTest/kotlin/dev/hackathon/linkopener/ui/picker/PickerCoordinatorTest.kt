@@ -270,6 +270,58 @@ class PickerCoordinatorTest {
         assertEquals(emptyList(), state.browsers)
     }
 
+    @Test
+    fun discoveryFailureInvokesLogErrorCallback() = runTest {
+        val recorded = mutableListOf<Pair<String, String?>>()
+        val coord = PickerCoordinator(
+            discoverBrowsers = DiscoverBrowsersUseCase(ThrowingBrowserRepository()),
+            getSettings = GetSettingsFlowUseCase(InMemorySettingsRepository()),
+            launcher = RecordingLauncher(),
+            ruleEngine = RuleEngine(),
+            scope = this,
+            logError = { tag, throwable -> recorded += tag to throwable.message },
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        // The default callback writes to stderr; the injected one captures
+        // the call so we can assert both the tag (so devs can grep) and the
+        // forwarded throwable.
+        assertEquals(1, recorded.size)
+        assertEquals("picker", recorded[0].first)
+        assertEquals("discovery failed", recorded[0].second)
+    }
+
+    @Test
+    fun successfulDiscoveryDoesNotInvokeLogError() = runTest {
+        val recorded = mutableListOf<Pair<String, Throwable>>()
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari),
+        )
+        // Sanity: handle a URL that goes through the happy path. This
+        // coordinator was built without an injected logError, but we can
+        // re-verify with one wired in by reaching for the explicit ctor.
+        val coord2 = PickerCoordinator(
+            discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(listOf(safari))),
+            getSettings = GetSettingsFlowUseCase(InMemorySettingsRepository()),
+            launcher = RecordingLauncher(),
+            ruleEngine = RuleEngine(),
+            scope = this,
+            logError = { tag, t -> recorded += tag to t },
+        )
+
+        coord2.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyList(), recorded)
+        // and the silent-original-coord still works
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+        assertIs<PickerState.Showing>(coord.state.value)
+    }
+
     private fun newCoordinator(
         scope: kotlinx.coroutines.test.TestScope,
         browsers: List<Browser> = emptyList(),

@@ -147,6 +147,85 @@ class ChromiumProfileScannerTest {
     }
 
     @Test
+    fun returnsEmptyWhenProfileFieldIsMissing() {
+        // Local State without a "profile" key — uncommon but possible on
+        // freshly-installed Chrome before any profile has been opened.
+        val dir = newDir().withLocalState("""{}""")
+
+        val profiles = scanner.scan(dir)
+
+        assertEquals(emptyList(), profiles)
+    }
+
+    @Test
+    fun returnsEmptyWhenProfileFieldIsNotAnObject() {
+        // Defensive: corrupted Local State where "profile" was a string
+        // (some old Chromium fork or a sync glitch). Type-cast guard kicks in.
+        val dir = newDir().withLocalState("""{"profile":"oops"}""")
+
+        val profiles = scanner.scan(dir)
+
+        assertEquals(emptyList(), profiles)
+    }
+
+    @Test
+    fun returnsEmptyWhenInfoCacheIsNotAnObject() {
+        // info_cache typed wrong — e.g. an array instead of a map.
+        val dir = newDir().withLocalState(
+            """{"profile":{"info_cache":[]}}""",
+        )
+
+        val profiles = scanner.scan(dir)
+
+        assertEquals(emptyList(), profiles)
+    }
+
+    @Test
+    fun nonObjectEntryFallsBackToIdAsDisplayName() {
+        // info_cache contains a non-JsonObject entry — the scanner should
+        // still emit the profile, falling back to id-as-name (the
+        // `obj as? JsonObject` cast goes null and Elvis chain reaches `id`).
+        val dir = newDir().withLocalState(
+            """{"profile":{"info_cache":{"Default":"oddly a string","Profile 1":{"name":"Work"}}}}""",
+        )
+
+        val profiles = scanner.scan(dir)
+
+        assertEquals(
+            listOf(
+                BrowserProfile("Default", "Default"),
+                BrowserProfile("Profile 1", "Work"),
+            ),
+            profiles,
+        )
+    }
+
+    @Test
+    fun blankNameFallsBackToGaiaName() {
+        // The string() helper rejects blank strings via takeIf { isNotBlank() }
+        // so a "name":"" should fall through to gaia_name. Cookie-domain
+        // shortcut for "name was set to nothing".
+        val dir = newDir().withLocalState(
+            """{"profile":{"info_cache":{"Default":{"name":"","gaia_name":"v@x.com"}}}}""",
+        )
+
+        val profiles = scanner.scan(dir)
+
+        assertEquals(listOf(BrowserProfile("Default", "v@x.com")), profiles)
+    }
+
+    @Test
+    fun blankNameAndBlankGaiaNameFallBackToId() {
+        val dir = newDir().withLocalState(
+            """{"profile":{"info_cache":{"Profile 7":{"name":"","gaia_name":""}}}}""",
+        )
+
+        val profiles = scanner.scan(dir)
+
+        assertEquals(listOf(BrowserProfile("Profile 7", "Profile 7")), profiles)
+    }
+
+    @Test
     fun unicodeAndEmojiNamesAreHandled() {
         val dir = newDir().withLocalState(
             """

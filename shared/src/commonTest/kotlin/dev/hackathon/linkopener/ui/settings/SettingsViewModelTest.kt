@@ -656,9 +656,233 @@ class SettingsViewModelTest {
         assertEquals(emptySet(), vm.settings.value.excludedBrowserIds)
     }
 
+    // --- mutateRules early-return paths ---------------------------------------
+    // The five rule-mutation methods all delegate to a private `mutateRules`
+    // helper that swallows out-of-range indices and equal-value updates as
+    // no-ops. Each branch needs its own coverage so a regression in the
+    // helper or in one of the callers can't pass silently.
+
+    @Test
+    fun onMoveRuleWithFromEqualsToIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val rules = listOf(
+            dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId),
+            dev.hackathon.linkopener.core.model.UrlRule("b", firefoxId),
+        )
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onMoveRule(0, 0)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    @Test
+    fun onMoveRuleWithFromOutOfRangeIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId))
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onMoveRule(99, 0)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    @Test
+    fun onMoveRuleWithToOutOfRangeIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val rules = listOf(
+            dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId),
+            dev.hackathon.linkopener.core.model.UrlRule("b", firefoxId),
+        )
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onMoveRule(0, 99)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    @Test
+    fun onUpdateRulePatternWithSameValueIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("same", firefoxId))
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onUpdateRulePattern(0, "same")
+        testScheduler.advanceUntilIdle()
+
+        // setRules wasn't called — the original list reference would be the
+        // same instance after a successful update too, but here we also know
+        // the early return short-circuited the launch.
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    @Test
+    fun onUpdateRulePatternWithOutOfRangeIndexIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId))
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onUpdateRulePattern(99, "ignored")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    @Test
+    fun onUpdateRuleBrowserWithSameValueIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId))
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onUpdateRuleBrowser(0, firefoxId)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    @Test
+    fun onUpdateRuleBrowserWithOutOfRangeIndexIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val firefoxId = BrowserId("/Apps/Firefox.app")
+        val rules = listOf(dev.hackathon.linkopener.core.model.UrlRule("a", firefoxId))
+        repo.emit(repo.settings.value.copy(rules = rules))
+        val vm = newViewModel(repo = repo, scope = this)
+
+        vm.onUpdateRuleBrowser(99, BrowserId("/Apps/Chrome.app"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(rules, repo.settings.value.rules)
+    }
+
+    // --- reorder() edge cases -------------------------------------------------
+
+    @Test
+    fun onMoveBrowserDownAtLastPositionIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
+        val chrome = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome.app", null)
+        val vm = newViewModel(repo = repo, browsers = listOf(safari, chrome), scope = this)
+        testScheduler.advanceUntilIdle()
+
+        vm.onMoveBrowserDown(BrowserId("/Applications/Chrome.app"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyList(), vm.settings.value.browserOrder)
+    }
+
+    @Test
+    fun onMoveBrowserDownForUnknownIdIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
+        val vm = newViewModel(repo = repo, browsers = listOf(safari), scope = this)
+        testScheduler.advanceUntilIdle()
+
+        vm.onMoveBrowserDown(BrowserId("/Apps/DoesNotExist.app"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyList(), vm.settings.value.browserOrder)
+    }
+
+    @Test
+    fun onMoveBrowserUpForUnknownIdIsNoOp() = runTest {
+        val repo = FakeSettingsRepository()
+        val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", null)
+        val vm = newViewModel(repo = repo, browsers = listOf(safari), scope = this)
+        testScheduler.advanceUntilIdle()
+
+        vm.onMoveBrowserUp(BrowserId("/Apps/DoesNotExist.app"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyList(), vm.settings.value.browserOrder)
+    }
+
+    @Test
+    fun onMoveBrowserDownWhileLoadingIsNoOp() = runTest {
+        // Reorder requires a Loaded state; if the user races a click against
+        // an in-flight discovery, the helper bails before touching anything.
+        // Isolated scope so the never-completing discovery launch can be
+        // cancelled cleanly without runTest complaining about active jobs.
+        val vmScope = CoroutineScope(coroutineContext + Job())
+        try {
+            val repo = FakeSettingsRepository()
+            val vm = newViewModel(
+                repo = repo,
+                browserRepository = NeverCompletingBrowserRepository(),
+                scope = vmScope,
+            )
+            // No advanceUntilIdle — discovery never resolves, state stays Loading.
+
+            vm.onMoveBrowserDown(BrowserId("/Apps/Whatever.app"))
+
+            assertEquals(BrowsersState.Loading, vm.browsers.value)
+            assertEquals(emptyList(), vm.settings.value.browserOrder)
+        } finally {
+            vmScope.cancel()
+        }
+    }
+
+    // --- applyLocale callback -------------------------------------------------
+
+    @Test
+    fun onLanguageSelectedFiresApplyLocaleCallbackSynchronously() = runTest {
+        // The callback must fire on the calling thread *before* the suspend
+        // launch is dispatched — that's how the VM wins the race against
+        // the Window subcomposition (see onLanguageSelected's KDoc).
+        val recorded = mutableListOf<AppLanguage>()
+        val repo = FakeSettingsRepository()
+        val vm = SettingsViewModel(
+            getSettings = GetSettingsFlowUseCase(repo),
+            updateTheme = UpdateThemeUseCase(repo),
+            updateLanguage = UpdateLanguageUseCase(repo),
+            setAutoStart = SetAutoStartUseCase(repo),
+            setBrowserExcluded = SetBrowserExcludedUseCase(repo),
+            setBrowserOrder = SetBrowserOrderUseCase(repo),
+            addManualBrowser = AddManualBrowserUseCase(
+                extractor = NoopExtractor,
+                settings = repo,
+                browsers = StaticBrowserRepository(emptyList()),
+                ownBundleId = "test",
+            ),
+            removeManualBrowser = RemoveManualBrowserUseCase(repo),
+            setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(repo),
+            setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(repo),
+            discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
+            observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(FakeDefaultBrowserService()),
+            getIsDefaultBrowser = GetIsDefaultBrowserUseCase(FakeDefaultBrowserService()),
+            openDefaultBrowserSettings = OpenDefaultBrowserSettingsUseCase(FakeDefaultBrowserService()),
+            getCanOpenSystemSettings = GetCanOpenSystemSettingsUseCase(FakeDefaultBrowserService()),
+            scope = this,
+            applyLocale = { recorded += it },
+        )
+
+        vm.onLanguageSelected(AppLanguage.Ru)
+        // Note: NO advanceUntilIdle — the callback should fire BEFORE the
+        // launched suspend has any chance to run.
+        assertEquals(listOf(AppLanguage.Ru), recorded)
+
+        testScheduler.advanceUntilIdle()
+        // After the launch resolves, the persisted language matches.
+        assertEquals(AppLanguage.Ru, repo.lastLanguage)
+    }
+
     private fun newViewModel(
         repo: SettingsRepository,
-        scope: TestScope,
+        scope: CoroutineScope,
         browsers: List<Browser> = emptyList(),
         browserRepository: BrowserRepository = StaticBrowserRepository(browsers),
         defaultBrowserService: DefaultBrowserService = FakeDefaultBrowserService(),
@@ -781,6 +1005,20 @@ class SettingsViewModelTest {
     private class ThrowingBrowserRepository(private val message: String) : BrowserRepository {
         override suspend fun getInstalledBrowsers(): List<Browser> = error(message)
         override suspend fun refresh(): List<Browser> = error(message)
+    }
+
+    /**
+     * Repository whose discover() suspends forever — keeps the VM stuck in
+     * BrowsersState.Loading so reorder() can be exercised against the
+     * non-Loaded branch without races against the test scheduler.
+     */
+    private class NeverCompletingBrowserRepository : BrowserRepository {
+        override suspend fun getInstalledBrowsers(): List<Browser> {
+            kotlinx.coroutines.awaitCancellation()
+        }
+        override suspend fun refresh(): List<Browser> {
+            kotlinx.coroutines.awaitCancellation()
+        }
     }
 
     private class FakeDefaultBrowserService(
