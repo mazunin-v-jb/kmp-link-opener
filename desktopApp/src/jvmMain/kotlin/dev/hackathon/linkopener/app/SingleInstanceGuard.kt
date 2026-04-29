@@ -1,6 +1,8 @@
 package dev.hackathon.linkopener.app
 
+import java.io.BufferedReader
 import java.io.IOException
+import java.io.InputStreamReader
 import java.io.RandomAccessFile
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -9,6 +11,7 @@ import java.net.Socket
 import java.net.SocketException
 import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -23,16 +26,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  *   OS releases the lock on process death (including SIGKILL), so a crashed
  *   primary never permanently wedges a future startup.
  * - `instance.port` — TCP port of the primary's loopback `ServerSocket`.
- *   Secondary reads it, connects, sends a single byte, exits. Port `0` means
- *   the OS picks a free port, so we don't fight with anything else on the
- *   loopback interface.
+ *   Secondary reads it, connects, optionally sends a UTF-8 line, exits.
+ *   Port `0` means the OS picks a free port, so we don't fight with anything
+ *   else on the loopback interface.
  *
- * Activation protocol is intentionally tiny: any inbound connection is treated
- * as "the user just tried to launch a second copy". We don't pass URLs or
- * arguments yet — Launch Services on macOS already routes URLs to the live
- * instance via the OpenURIHandler, and on Windows / Linux that path isn't
- * wired yet (stages 7/8). When/if it is, extend the protocol to a
- * newline-terminated payload.
+ * Activation protocol (newline-terminated, UTF-8):
+ * - Empty line (`\n`) — "activate me" (Settings should pop / nudge).
+ * - `<url>\n` — "open this URL in the picker". Used on Windows when a
+ *   secondary process was spawned by Windows' URL handler with the URL
+ *   on argv; the secondary forwards to the primary, then exits.
+ *
+ * macOS doesn't use the URL payload — Launch Services routes URLs to the
+ * already-running primary via the OpenURIHandler before any second JVM
+ * spawns. Linux is stage 8.
  */
 class SingleInstanceGuard private constructor(
     private val lockFile: RandomAccessFile,
@@ -40,8 +46,13 @@ class SingleInstanceGuard private constructor(
     private val serverSocket: ServerSocket,
     private val portFile: Path,
 ) {
+    /**
+     * Invoked when a secondary instance pings us. The String argument
+     * is the URL the secondary wants opened, or null when the secondary
+     * sent only the "activate me" signal (empty line).
+     */
     @Volatile
-    var onActivationRequest: () -> Unit = {}
+    var onActivationRequest: (url: String?) -> Unit = {}
 
     private val released = AtomicBoolean(false)
     private val listenerThread: Thread = Thread(::runListener, "single-instance-listener").apply {
@@ -60,17 +71,18 @@ class SingleInstanceGuard private constructor(
                 // Anything else: don't let one bad connection kill the loop.
                 continue
             }
-            try {
+            val payload: String? = try {
                 client.use {
-                    // Drain the single byte the secondary sends. We don't care
-                    // about the payload — any connection means "activate me".
                     it.soTimeout = ACCEPT_DRAIN_TIMEOUT_MS
-                    runCatching { it.getInputStream().read() }
+                    val reader = BufferedReader(InputStreamReader(it.getInputStream(), StandardCharsets.UTF_8))
+                    runCatching { reader.readLine() }.getOrNull()
                 }
             } catch (_: IOException) {
-                // ignored — best-effort drain.
+                null
             }
-            runCatching { onActivationRequest() }.onFailure { t ->
+            // Empty / null payload = bare activation; non-empty = URL.
+            val url = payload?.takeIf { it.isNotBlank() }
+            runCatching { onActivationRequest(url) }.onFailure { t ->
                 System.err.println("[single-instance] activation handler threw: ${t.message}")
             }
         }
@@ -97,7 +109,7 @@ class SingleInstanceGuard private constructor(
         private const val PORT_FILE_NAME = "instance.port"
         private const val APP_DIR_NAME = ".linkopener"
         private const val SIGNAL_CONNECT_TIMEOUT_MS = 1_000
-        private const val ACCEPT_DRAIN_TIMEOUT_MS = 200
+        private const val ACCEPT_DRAIN_TIMEOUT_MS = 500
         private const val LISTENER_JOIN_TIMEOUT_MS = 500L
         private const val SOCKET_BACKLOG = 4
 
@@ -108,8 +120,13 @@ class SingleInstanceGuard private constructor(
          *   [onActivationRequest] and keeps the reference for the lifetime of
          *   the JVM.
          * - Returns `null` if another live instance holds the lock; in that
-         *   case this method has already pinged the primary so it can react,
-         *   and the caller should exit cleanly.
+         *   case this method has already pinged the primary (with [urlPayload]
+         *   if provided) so it can react, and the caller should exit cleanly.
+         *
+         * @param urlPayload optional URL to forward to the primary on the
+         * "we're a secondary" path. Used when this JVM was spawned by the
+         * Windows URL handler with the URL on argv — the primary picks it
+         * up, opens the picker, and the secondary exits cleanly.
          *
          * Failure modes: if creating [appDir], opening the lock file, or
          * binding the server socket throws, the exception propagates. Those
@@ -117,7 +134,10 @@ class SingleInstanceGuard private constructor(
          * loopback interface unavailable) and are louder if surfaced than
          * silently degraded.
          */
-        fun acquireOrSignal(appDir: Path = defaultAppDir()): SingleInstanceGuard? {
+        fun acquireOrSignal(
+            appDir: Path = defaultAppDir(),
+            urlPayload: String? = null,
+        ): SingleInstanceGuard? {
             Files.createDirectories(appDir)
             val lockPath = appDir.resolve(LOCK_FILE_NAME)
             val portPath = appDir.resolve(PORT_FILE_NAME)
@@ -135,7 +155,7 @@ class SingleInstanceGuard private constructor(
 
             if (lock == null) {
                 // We're the secondary. Ping the primary best-effort and bail.
-                runCatching { signalPrimary(portPath) }
+                runCatching { signalPrimary(portPath, urlPayload) }
                 runCatching { raf.close() }
                 return null
             }
@@ -166,7 +186,7 @@ class SingleInstanceGuard private constructor(
             return SingleInstanceGuard(raf, lock, server, portPath)
         }
 
-        private fun signalPrimary(portFile: Path) {
+        private fun signalPrimary(portFile: Path, urlPayload: String?) {
             if (!Files.exists(portFile)) return
             val port = runCatching { Files.readString(portFile).trim().toInt() }
                 .getOrNull()
@@ -177,7 +197,13 @@ class SingleInstanceGuard private constructor(
                     InetSocketAddress(InetAddress.getLoopbackAddress(), port),
                     SIGNAL_CONNECT_TIMEOUT_MS,
                 )
+                // Always end with newline. URL-bearing payload writes the
+                // URL bytes first; bare activation sends just the newline.
+                // The primary's listener reads one line via BufferedReader.
                 sock.getOutputStream().apply {
+                    if (urlPayload != null && urlPayload.isNotBlank()) {
+                        write(urlPayload.toByteArray(StandardCharsets.UTF_8))
+                    }
                     write('\n'.code)
                     flush()
                 }
