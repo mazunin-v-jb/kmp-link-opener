@@ -123,6 +123,10 @@ kover {
                     "dev.hackathon.linkopener.platform.macos.PlutilRunner*",
                     "dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager*",
                     "dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService*",
+                    // Stage 7 Windows impls — exercised on a real Windows host;
+                    // their parsers and argv builders ARE unit-tested via
+                    // captured fixtures (RegistryReader.parseSubKeys / parseSingleValue,
+                    // WindowsBrowserDiscovery.stripCommandSuffix, WindowsLinkLauncher.buildArgs).
                     "dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService*",
                 )
             }

@@ -44,3 +44,27 @@ fun detectBrowserFamily(bundleId: String): BrowserFamily = when {
     bundleId.startsWith("com.apple.Safari") -> BrowserFamily.Safari
     else -> BrowserFamily.Other
 }
+
+/**
+ * Windows-style family detection: bundle-id-by-string-key (registry
+ * sub-key names like `Google Chrome`) doesn't fit the macOS reverse-DNS
+ * format, so we keyword-match on display name. Used by
+ * [dev.hackathon.linkopener.platform.windows.WindowsBrowserDiscovery].
+ *
+ * Conservative: anything we don't recognise → [BrowserFamily.Other],
+ * which means the launcher won't add Chromium-specific flags. Adding a
+ * new Chromium-family Windows browser = one keyword here.
+ */
+fun detectBrowserFamilyByDisplayName(displayName: String): BrowserFamily {
+    val lower = displayName.lowercase()
+    return when {
+        "chrome" in lower ||
+            "edge" in lower ||
+            "brave" in lower ||
+            "vivaldi" in lower ||
+            "opera" in lower ||
+            "chromium" in lower -> BrowserFamily.Chromium
+        "firefox" in lower -> BrowserFamily.Firefox
+        else -> BrowserFamily.Other
+    }
+}
