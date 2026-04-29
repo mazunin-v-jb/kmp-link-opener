@@ -7,6 +7,7 @@ import dev.hackathon.linkopener.platform.macos.MacOsBrowserDiscovery
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserMetadataExtractor
 import dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService
 import dev.hackathon.linkopener.platform.macos.MacOsLinkLauncher
+import dev.hackathon.linkopener.platform.windows.WindowsAutoStartManager
 import dev.hackathon.linkopener.platform.windows.WindowsBrowserDiscovery
 import dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService
 import dev.hackathon.linkopener.platform.windows.WindowsLinkLauncher
@@ -17,7 +18,7 @@ object PlatformFactory {
 
     fun createAutoStartManager(): AutoStartManager = when (currentOs) {
         HostOs.MacOs -> MacOsAutoStartManager()
-        HostOs.Windows,
+        HostOs.Windows -> WindowsAutoStartManager()
         HostOs.Linux,
         HostOs.Other -> NoOpAutoStartManager()
     }
