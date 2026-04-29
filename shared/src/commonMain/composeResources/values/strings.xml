@@ -115,6 +115,10 @@
     <string name="tooltip_close">Close settings without quitting Link Opener</string>
     <string name="tooltip_drag_to_reorder">Drag to reorder</string>
 
+    <string name="help_dialog_title">About Link Opener</string>
+    <string name="help_dialog_body">Two extremely cool guys™ and Claude Code spent a hackathon putting this together.\n\nRuns on a strict diet of vibes, prayers, and copious caffeine. Mileage may vary. Performance not guaranteed past sunset.\n\nFound a bug? Three options:\n\n→ Open a [Pull Request](https://github.com/mazunin-v-jb/kmp-link-opener) — bring fixes\n→ File an [Issue](https://github.com/mazunin-v-jb/kmp-link-opener/issues) — bring problems\n→ [Light a candle](https://chapel-online.com/category/postavit-svechku/) — for the app's repose, or its swift recovery. Whichever fits the situation.</string>
+    <string name="help_dialog_close">Close</string>
+
     <string-array name="default_browser_instructions_android">
         <item>Tap the button below — Android will show a system dialog asking if you want Link Opener as your default browser.</item>
         <item>If the dialog doesn\'t appear (older Android), it will open Settings → Apps → Default apps instead.</item>

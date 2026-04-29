@@ -43,6 +43,7 @@ private const val EASTER_EGG_PROBABILITY = 0.05f
 @Composable
 internal fun SettingsTopAppBar(
     onRefresh: () -> Unit,
+    onHelp: () -> Unit,
     onCloseRequest: () -> Unit,
     showCloseButton: Boolean = true,
 ) {
@@ -104,7 +105,7 @@ internal fun SettingsTopAppBar(
                 }
             }
             TopBarTooltip(text = helpTooltip) {
-                IconButton(onClick = { /* TODO: help action */ }) {
+                IconButton(onClick = onHelp) {
                     Icon(
                         painter = AppIcons.Help,
                         contentDescription = helpTooltip,

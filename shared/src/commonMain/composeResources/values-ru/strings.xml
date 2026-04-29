@@ -107,6 +107,10 @@
     <string name="tooltip_close">Закрыть окно настроек, не завершая работу</string>
     <string name="tooltip_drag_to_reorder">Потяни, чтобы поменять порядок</string>
 
+    <string name="help_dialog_title">О приложении</string>
+    <string name="help_dialog_body">Этот эпохальный труд два крутых чувака и Claude Code собрали в рамках хакатона.\n\nРаботает на чистых вибрациях, молитвах и литрах кофе. Гарантий нет, после заката пробег может отличаться.\n\nЧто-то отвалилось? Три варианта:\n\n→ Открыть [Pull Request](https://github.com/mazunin-v-jb/kmp-link-opener) — приходите с фиксами\n→ Завести [Issue](https://github.com/mazunin-v-jb/kmp-link-opener/issues) — приходите с проблемами\n→ [Поставить свечку](https://chapel-online.ru/category/postavit-svechku/besplatno/) — за упокой или за здравие, на ваше усмотрение.</string>
+    <string name="help_dialog_close">Закрыть</string>
+
     <string-array name="default_browser_instructions_android">
         <item>Нажми кнопку ниже — Android покажет системный диалог "Сделать Link Opener браузером по умолчанию?".</item>
         <item>Если диалог не появился (на старых версиях Android), откроется Настройки → Приложения → Приложения по умолчанию.</item>

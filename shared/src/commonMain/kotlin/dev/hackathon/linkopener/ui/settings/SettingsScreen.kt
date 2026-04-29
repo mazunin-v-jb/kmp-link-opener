@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.settings.components.BottomNavBar
+import dev.hackathon.linkopener.ui.settings.components.HelpDialog
 import dev.hackathon.linkopener.ui.settings.components.NotDefaultBanner
 import dev.hackathon.linkopener.ui.settings.components.SettingsTopAppBar
 import dev.hackathon.linkopener.ui.settings.components.Sidebar
@@ -66,6 +67,7 @@ fun SettingsScreen(
         ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap()) }
         ).collectAsState()
     var activeSection by remember { mutableStateOf(NavSection.DefaultBrowser) }
+    var showHelp by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val nudgeMessage = stringResource(Res.string.nudge_already_running)
     LaunchedEffect(nudges, nudgeMessage) {
@@ -92,6 +94,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.fillMaxSize()) {
                     SettingsTopAppBar(
                         onRefresh = viewModel::refresh,
+                        onHelp = { showHelp = true },
                         onCloseRequest = onCloseRequest,
                         showCloseButton = settings.showCloseButton,
                     )
@@ -160,6 +163,9 @@ fun SettingsScreen(
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
             )
+            if (showHelp) {
+                HelpDialog(onDismiss = { showHelp = false })
+            }
         }
     }
 }
