@@ -176,46 +176,44 @@ class SettingsViewModel(
 
     // --- Rules (stage 6) ----------------------------------------------------
     // Each method computes the new list and fires SetRulesUseCase. Out-of-range
-    // indices are silent no-ops (UI commands race with state in theory; cheaper
-    // to ignore than throw).
+    // indices and no-op edits are silent (UI commands race with state in
+    // theory; cheaper to ignore than throw). The mutateRules helper centralises
+    // the read/null-skip/launch shape so each public method is just the
+    // transform.
 
-    fun onAddRule(pattern: String, browserId: BrowserId) {
-        val current = settings.value.rules
-        scope.launch { setRules(current + UrlRule(pattern, browserId)) }
+    fun onAddRule(pattern: String, browserId: BrowserId) =
+        mutateRules { it + UrlRule(pattern, browserId) }
+
+    fun onRemoveRule(index: Int) = mutateRules { current ->
+        if (index !in current.indices) null
+        else current.toMutableList().also { it.removeAt(index) }
     }
 
-    fun onRemoveRule(index: Int) {
-        val current = settings.value.rules
-        if (index !in current.indices) return
-        scope.launch { setRules(current.toMutableList().also { it.removeAt(index) }) }
+    fun onMoveRule(fromIndex: Int, toIndex: Int) = mutateRules { current ->
+        if (fromIndex !in current.indices || toIndex !in current.indices) return@mutateRules null
+        if (fromIndex == toIndex) return@mutateRules null
+        current.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
     }
 
-    fun onMoveRule(fromIndex: Int, toIndex: Int) {
-        val current = settings.value.rules
-        if (fromIndex !in current.indices || toIndex !in current.indices) return
-        if (fromIndex == toIndex) return
-        val mutable = current.toMutableList()
-        val item = mutable.removeAt(fromIndex)
-        mutable.add(toIndex, item)
-        scope.launch { setRules(mutable) }
+    fun onUpdateRulePattern(index: Int, pattern: String) = mutateRules { current ->
+        if (index !in current.indices || current[index].pattern == pattern) null
+        else current.mapIndexed { i, r -> if (i == index) r.copy(pattern = pattern) else r }
     }
 
-    fun onUpdateRulePattern(index: Int, pattern: String) {
-        val current = settings.value.rules
-        if (index !in current.indices) return
-        if (current[index].pattern == pattern) return
-        scope.launch {
-            setRules(current.mapIndexed { i, r -> if (i == index) r.copy(pattern = pattern) else r })
-        }
+    fun onUpdateRuleBrowser(index: Int, browserId: BrowserId) = mutateRules { current ->
+        if (index !in current.indices || current[index].browserId == browserId) null
+        else current.mapIndexed { i, r -> if (i == index) r.copy(browserId = browserId) else r }
     }
 
-    fun onUpdateRuleBrowser(index: Int, browserId: BrowserId) {
-        val current = settings.value.rules
-        if (index !in current.indices) return
-        if (current[index].browserId == browserId) return
-        scope.launch {
-            setRules(current.mapIndexed { i, r -> if (i == index) r.copy(browserId = browserId) else r })
-        }
+    /**
+     * Applies [transform] to the current rules list and persists the result.
+     * Returning `null` from [transform] means "no-op" — used by guards
+     * (out-of-range index, equal-value edit) so each public mutator stays a
+     * one-liner instead of repeating the launch + early-return scaffolding.
+     */
+    private fun mutateRules(transform: (List<UrlRule>) -> List<UrlRule>?) {
+        val updated = transform(settings.value.rules) ?: return
+        scope.launch { setRules(updated) }
     }
 
     private fun reorder(id: BrowserId, delta: Int) {

@@ -22,17 +22,8 @@ class MacOsBrowserDiscovery(
 ) : BrowserDiscovery {
 
     override suspend fun discover(): List<Browser> = withContext(Dispatchers.IO) {
-        val candidates = searchRoots
-            .flatMap { scanner.findAppBundles(it) }
-            .map { resolveSafely(it) }
-            .distinct()
-
-        val parents = coroutineScope {
-            candidates.map { path -> async { plistReader.readBrowser(path) } }.awaitAll()
-        }
-            .filterNotNull()
-            .distinctBy { it.applicationPath }
-
+        val candidates = findCandidatePaths()
+        val parents = readBrowsersInParallel(candidates)
         // For each parent browser, classify by family and (for Chromium with
         // ≥2 profiles) expand into one record per profile. Single-profile
         // Chromium and non-Chromium browsers stay as a single record without
@@ -42,6 +33,31 @@ class MacOsBrowserDiscovery(
             .flatMap { expandWithProfiles(it) }
             .sortedBy { it.displayName.lowercase() }
     }
+
+    /**
+     * Walks every [searchRoots] entry for `.app` bundles, canonicalises the
+     * resolved paths (so a symlink and its target dedupe), and returns each
+     * unique path once. Result order is roots-then-bundle-order — the parallel
+     * plist read in [readBrowsersInParallel] doesn't depend on order.
+     */
+    private fun findCandidatePaths(): List<Path> = searchRoots
+        .flatMap { scanner.findAppBundles(it) }
+        .map { resolveSafely(it) }
+        .distinct()
+
+    /**
+     * Reads the `Info.plist` of every candidate concurrently (each plist read
+     * shells out to `plutil` — single-threaded would serialise ~1-3 seconds per
+     * browser), drops the null returns (not-a-browser / unreadable plist), and
+     * dedupes by [Browser.applicationPath] so the same bundle surfacing under
+     * two roots (e.g. `/System/Applications` + symlinked alias) only appears
+     * once.
+     */
+    private suspend fun readBrowsersInParallel(paths: List<Path>): List<Browser> = coroutineScope {
+        paths.map { path -> async { plistReader.readBrowser(path) } }.awaitAll()
+    }
+        .filterNotNull()
+        .distinctBy { it.applicationPath }
 
     private fun expandWithProfiles(parent: Browser): List<Browser> {
         val family = detectBrowserFamily(parent.bundleId)

@@ -14,6 +14,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
+import dev.hackathon.linkopener.app.DebugFlags
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
@@ -98,11 +99,10 @@ private fun ApplicationScope.TrayHostBody(
                 stringResource(Res.string.tray_menu_settings),
                 onClick = { settingsAnchor = currentCursorPosition() },
             )
-            // Dev-only "Test picker" — only shown when -Dlinkopener.debug=true
-            // is on the JVM args (matches the same flag that gates the
-            // discovery dump in AppContainer). Stamped public builds get
+            // Dev-only "Test picker" — gated on the same DebugFlags.enabled
+            // toggle as the startup discovery dump. Stamped public builds get
             // launched without the flag and never see this entry.
-            if (System.getProperty("linkopener.debug") == "true") {
+            if (DebugFlags.enabled) {
                 Item(
                     stringResource(Res.string.tray_menu_test_picker),
                     onClick = { container.pickerCoordinator.handleIncomingUrl("https://example.com/?utm=picker-test") },

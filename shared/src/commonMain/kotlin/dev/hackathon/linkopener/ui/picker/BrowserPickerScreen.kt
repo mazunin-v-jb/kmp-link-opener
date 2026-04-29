@@ -36,11 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.uiLabel
-import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLow
-import dev.hackathon.linkopener.ui.theme.DarkSurfaceContainerLowest
-import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLow
-import dev.hackathon.linkopener.ui.theme.LightSurfaceContainerLowest
-import dev.hackathon.linkopener.ui.theme.LocalIsDarkMode
+import dev.hackathon.linkopener.ui.theme.BrowserAvatar
+import dev.hackathon.linkopener.ui.theme.surfaceContainerLow
 import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.picker_empty
 import kmp_link_opener.shared.generated.resources.picker_empty_hint
@@ -178,7 +175,7 @@ private fun BrowserRow(browser: Browser, onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBox(initial = browser.displayName.firstOrNull()?.uppercase() ?: "?")
+        BrowserAvatar(initial = browser.displayName.firstOrNull()?.uppercase() ?: "?", bordered = true)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -197,33 +194,6 @@ private fun BrowserRow(browser: Browser, onClick: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun IconBox(initial: String) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .background(
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(6.dp),
-            )
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(6.dp),
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = initial,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-            color = MaterialTheme.colorScheme.primary,
-        )
     }
 }
 
@@ -268,11 +238,3 @@ private fun EmptyState() {
     }
 }
 
-@Composable
-private fun surfaceContainerLow(): androidx.compose.ui.graphics.Color =
-    if (LocalIsDarkMode.current) DarkSurfaceContainerLow else LightSurfaceContainerLow
-
-@Suppress("unused")
-@Composable
-private fun surfaceContainerLowest(): androidx.compose.ui.graphics.Color =
-    if (LocalIsDarkMode.current) DarkSurfaceContainerLowest else LightSurfaceContainerLowest

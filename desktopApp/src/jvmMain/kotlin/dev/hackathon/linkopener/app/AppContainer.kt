@@ -1,6 +1,7 @@
 package dev.hackathon.linkopener.app
 
 import com.russhwolf.settings.Settings
+import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.data.AppInfoRepositoryImpl
 import dev.hackathon.linkopener.data.BrowserRepositoryImpl
 import dev.hackathon.linkopener.data.SettingsRepositoryImpl
@@ -101,7 +102,7 @@ class AppContainer {
         SetShowBrowserProfilesUseCase(settingsRepository)
 
     private val ruleEngine: RuleEngine = RuleEngine(
-        debug = DEBUG_LOGGING,
+        debug = DebugFlags.enabled,
         log = ::println,
     )
 
@@ -158,7 +159,7 @@ class AppContainer {
         coroutineScope.launch {
             try {
                 val browsers = discoverBrowsersUseCase()
-                if (DEBUG_LOGGING) {
+                if (DebugFlags.enabled) {
                     println("Discovered ${browsers.size} browser(s):")
                     browsers.forEach { browser ->
                         val version = browser.version ?: "(no version)"
@@ -202,19 +203,13 @@ class AppContainer {
     // override that Compose Resources reads through. Resolution itself is
     // delegated to the pure [resolveLocaleTag] helper so it can be unit-tested
     // without touching the global JVM Locale.
-    private fun applyJvmLocale(language: dev.hackathon.linkopener.core.model.AppLanguage) {
+    private fun applyJvmLocale(language: AppLanguage) {
         val target = java.util.Locale.forLanguageTag(resolveLocaleTag(language, systemLanguageTag))
         if (java.util.Locale.getDefault() != target) {
             java.util.Locale.setDefault(target)
         }
     }
 
-    private companion object {
-        // Set `-Dlinkopener.debug=true` (e.g. via JVM args in IDE run config or
-        // VM options when launching the .app from Terminal) to get the discovery
-        // dump and any other diagnostic prints in stdout.
-        val DEBUG_LOGGING: Boolean = System.getProperty("linkopener.debug") == "true"
-    }
 }
 
 /**
@@ -228,11 +223,11 @@ class AppContainer {
  * Supported tags are `en` and `ru`; any other system tag falls back to `en`.
  */
 internal fun resolveLocaleTag(
-    language: dev.hackathon.linkopener.core.model.AppLanguage,
+    language: AppLanguage,
     systemLanguageTag: String,
 ): String = when (language) {
-    dev.hackathon.linkopener.core.model.AppLanguage.En -> "en"
-    dev.hackathon.linkopener.core.model.AppLanguage.Ru -> "ru"
-    dev.hackathon.linkopener.core.model.AppLanguage.System ->
+    AppLanguage.En -> "en"
+    AppLanguage.Ru -> "ru"
+    AppLanguage.System ->
         if (systemLanguageTag == "ru") "ru" else "en"
 }
