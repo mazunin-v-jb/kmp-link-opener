@@ -10,86 +10,39 @@ class WindowsDefaultBrowserServiceTest {
 
     @Test
     fun isDefaultBrowserTrueWhenProgIdMatches() = runTest {
-        val registry = ScriptedRunner()
-            .with(
-                listOf(
-                    "reg", "query",
-                    "HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice",
-                    "/v", "ProgId",
-                ),
-                """
-                    HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice
-                        ProgId    REG_SZ    LinkOpener.URL
+        val service = WindowsDefaultBrowserService { "LinkOpener.URL" }
+        assertTrue(service.isDefaultBrowser())
+    }
 
-                """.trimIndent(),
-            )
-        val service = WindowsDefaultBrowserService(registry.build())
-
+    @Test
+    fun isDefaultBrowserTrueWhenStartMenuKeyReturned() = runTest {
+        // Chrome's elevation service can reset UserChoice; Windows then falls
+        // back to the StartMenuInternet sub-key name as the effective ProgId.
+        val service = WindowsDefaultBrowserService { "LinkOpener" }
         assertTrue(service.isDefaultBrowser())
     }
 
     @Test
     fun isDefaultBrowserFalseWhenProgIdIsAnotherApp() = runTest {
-        val registry = ScriptedRunner()
-            .with(
-                listOf(
-                    "reg", "query",
-                    "HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice",
-                    "/v", "ProgId",
-                ),
-                """
-                    HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice
-                        ProgId    REG_SZ    ChromeHTML
-
-                """.trimIndent(),
-            )
-        val service = WindowsDefaultBrowserService(registry.build())
-
+        val service = WindowsDefaultBrowserService { "ChromeHTML" }
         assertFalse(service.isDefaultBrowser())
     }
 
     @Test
-    fun isDefaultBrowserFalseWhenUserChoiceMissing() = runTest {
-        // Brand-new Windows install before the user has touched the
-        // default-app picker. UserChoice key doesn't exist yet.
-        val registry = ScriptedRunner() // no scripts → all queries return null
-        val service = WindowsDefaultBrowserService(registry.build())
-
+    fun isDefaultBrowserFalseWhenResolverReturnsNull() = runTest {
+        val service = WindowsDefaultBrowserService { null }
         assertFalse(service.isDefaultBrowser())
     }
 
     @Test
     fun isDefaultBrowserMatchIsCaseInsensitive() = runTest {
-        // Registry preserves casing in REG_SZ data; comparison should
-        // tolerate `linkopener.url` vs `LinkOpener.URL`.
-        val registry = ScriptedRunner()
-            .with(
-                listOf(
-                    "reg", "query",
-                    "HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice",
-                    "/v", "ProgId",
-                ),
-                """
-                    HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice
-                        ProgId    REG_SZ    LINKOPENER.URL
-
-                """.trimIndent(),
-            )
-        val service = WindowsDefaultBrowserService(registry.build())
-
+        val service = WindowsDefaultBrowserService { "LINKOPENER.URL" }
         assertTrue(service.isDefaultBrowser())
     }
 
     @Test
     fun canOpenSystemSettingsTrue() {
-        // No subprocess invocation here; just the contract-level read.
-        val service = WindowsDefaultBrowserService()
+        val service = WindowsDefaultBrowserService { null }
         assertEquals(true, service.canOpenSystemSettings)
-    }
-
-    private class ScriptedRunner {
-        private val outputs = mutableMapOf<List<String>, String>()
-        fun with(args: List<String>, output: String): ScriptedRunner = apply { outputs[args] = output }
-        fun build(): RegistryReader = RegistryReader(runner = { args -> outputs[args] })
     }
 }

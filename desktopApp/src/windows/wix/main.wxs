@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Based on jpackage's built-in main.wxs template (JDK 21.0.11).
+  Extended with HKLM browser-registration entries (Fragment below).
+
+  Why we override main.wxs instead of overrides.wxi:
+    overrides.wxi only accepts WiX preprocessor-variable redefinitions
+    (JpProductLanguage, JpInstallerVersion, etc.) — it cannot add Components
+    or registry entries. main.wxs is the correct override point for structural
+    additions. jpackage substitutes $(var.JpXxx) variables here just as it
+    would in its built-in template.
+
+  When the JDK is upgraded, re-extract the base template:
+    jar xf $JAVA_HOME/jmods/jdk.jpackage.jmod
+    cp classes/jdk/jpackage/internal/resources/main.wxs desktopApp/src/windows/wix/
+  Then re-apply the HKLM fragment below.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <?ifdef JpIsSystemWide ?>
+    <?define JpInstallScope="perMachine"?>
+  <?else?>
+    <?define JpInstallScope="perUser"?>
+  <?endif?>
+
+  <?define JpProductLanguage=1033 ?>
+  <?define JpInstallerVersion=200 ?>
+  <?define JpCompressedMsi=yes ?>
+
+  <?include $(var.JpConfigDir)/overrides.wxi ?>
+
+  <?ifdef JpAllowUpgrades ?>
+    <?define JpUpgradeVersionOnlyDetectUpgrade="no"?>
+  <?else?>
+    <?define JpUpgradeVersionOnlyDetectUpgrade="yes"?>
+  <?endif?>
+  <?ifdef JpAllowDowngrades ?>
+    <?define JpUpgradeVersionOnlyDetectDowngrade="no"?>
+  <?else?>
+    <?define JpUpgradeVersionOnlyDetectDowngrade="yes"?>
+  <?endif?>
+
+  <Product
+    Id="$(var.JpProductCode)"
+    Name="$(var.JpAppName)"
+    Language="$(var.JpProductLanguage)"
+    Version="$(var.JpAppVersion)"
+    Manufacturer="$(var.JpAppVendor)"
+    UpgradeCode="$(var.JpProductUpgradeCode)">
+
+    <Package
+      Description="$(var.JpAppDescription)"
+      Manufacturer="$(var.JpAppVendor)"
+      InstallerVersion="$(var.JpInstallerVersion)"
+      Compressed="$(var.JpCompressedMsi)"
+      InstallScope="$(var.JpInstallScope)" Platform="x64"
+    />
+
+    <Media Id="1" Cabinet="Data.cab" EmbedCab="yes" />
+
+    <Upgrade Id="$(var.JpProductUpgradeCode)">
+      <UpgradeVersion
+        OnlyDetect="$(var.JpUpgradeVersionOnlyDetectUpgrade)"
+        Property="JP_UPGRADABLE_FOUND"
+        Maximum="$(var.JpAppVersion)"
+        MigrateFeatures="yes"
+        IncludeMaximum="$(var.JpUpgradeVersionOnlyDetectUpgrade)" />
+      <UpgradeVersion
+        OnlyDetect="$(var.JpUpgradeVersionOnlyDetectDowngrade)"
+        Property="JP_DOWNGRADABLE_FOUND"
+        Minimum="$(var.JpAppVersion)"
+        MigrateFeatures="yes"
+        IncludeMinimum="$(var.JpUpgradeVersionOnlyDetectDowngrade)" />
+    </Upgrade>
+
+    <?ifndef JpAllowUpgrades ?>
+    <CustomAction Id="JpDisallowUpgrade" Error="!(loc.DisallowUpgradeErrorMessage)" />
+    <?endif?>
+    <?ifndef JpAllowDowngrades ?>
+    <CustomAction Id="JpDisallowDowngrade" Error="!(loc.DowngradeErrorMessage)" />
+    <?endif?>
+
+    <Binary Id="JpCaDll" SourceFile="wixhelper.dll"/>
+
+    <CustomAction Id="JpFindRelatedProducts" BinaryKey="JpCaDll" DllEntry="FindRelatedProductsEx" />
+
+    <!-- Standard required root -->
+    <Directory Id="TARGETDIR" Name="SourceDir"/>
+
+    <Feature Id="DefaultFeature" Title="!(loc.MainFeatureTitle)" Level="1">
+      <ComponentGroupRef Id="Shortcuts"/>
+      <ComponentGroupRef Id="Files"/>
+      <ComponentGroupRef Id="FileAssociations"/>
+      <!-- HKLM browser registration: ProgId + Capabilities + App Paths -->
+      <ComponentGroupRef Id="HklmBrowserRegistration"/>
+    </Feature>
+
+    <CustomAction Id="JpSetARPINSTALLLOCATION" Property="ARPINSTALLLOCATION" Value="[INSTALLDIR]" />
+    <CustomAction Id="JpSetARPCOMMENTS" Property="ARPCOMMENTS" Value="$(var.JpAppDescription)" />
+    <CustomAction Id="JpSetARPCONTACT" Property="ARPCONTACT" Value="$(var.JpAppVendor)" />
+    <CustomAction Id="JpSetARPSIZE" Property="ARPSIZE" Value="$(var.JpAppSizeKb)" />
+
+    <?ifdef JpHelpURL ?>
+      <CustomAction Id="JpSetARPHELPLINK" Property="ARPHELPLINK" Value="$(var.JpHelpURL)" />
+    <?endif?>
+
+    <?ifdef JpAboutURL ?>
+      <CustomAction Id="JpSetARPURLINFOABOUT" Property="ARPURLINFOABOUT" Value="$(var.JpAboutURL)" />
+    <?endif?>
+
+    <?ifdef JpUpdateURL ?>
+      <CustomAction Id="JpSetARPURLUPDATEINFO" Property="ARPURLUPDATEINFO" Value="$(var.JpUpdateURL)" />
+    <?endif?>
+
+    <?ifdef JpIcon ?>
+    <Property Id="ARPPRODUCTICON" Value="JpARPPRODUCTICON"/>
+    <Icon Id="JpARPPRODUCTICON" SourceFile="$(var.JpIcon)"/>
+    <?endif?>
+
+    <UIRef Id="JpUI"/>
+
+    <InstallExecuteSequence>
+      <Custom Action="JpSetARPINSTALLLOCATION" After="CostFinalize">Not Installed</Custom>
+      <Custom Action="JpSetARPCOMMENTS" After="CostFinalize">Not Installed</Custom>
+      <Custom Action="JpSetARPCONTACT" After="CostFinalize">Not Installed</Custom>
+      <Custom Action="JpSetARPSIZE" After="CostFinalize">Not Installed</Custom>
+      <?ifdef JpHelpURL ?>
+        <Custom Action="JpSetARPHELPLINK" After="CostFinalize">Not Installed</Custom>
+      <?endif?>
+      <?ifdef JpAboutURL ?>
+        <Custom Action="JpSetARPURLINFOABOUT" After="CostFinalize">Not Installed</Custom>
+      <?endif?>
+      <?ifdef JpUpdateURL ?>
+        <Custom Action="JpSetARPURLUPDATEINFO" After="CostFinalize">Not Installed</Custom>
+      <?endif?>
+
+      <?ifndef JpAllowUpgrades ?>
+      <Custom Action="JpDisallowUpgrade" After="JpFindRelatedProducts">JP_UPGRADABLE_FOUND</Custom>
+      <?endif?>
+      <?ifndef JpAllowDowngrades ?>
+      <Custom Action="JpDisallowDowngrade" After="JpFindRelatedProducts">JP_DOWNGRADABLE_FOUND</Custom>
+      <?endif?>
+      <RemoveExistingProducts Before="CostInitialize"/>
+      <Custom Action="JpFindRelatedProducts" After="FindRelatedProducts"/>
+    </InstallExecuteSequence>
+
+    <InstallUISequence>
+      <Custom Action="JpFindRelatedProducts" After="FindRelatedProducts"/>
+    </InstallUISequence>
+
+  </Product>
+
+  <!--
+    HKLM browser-registration fragment.
+    Written during MSI install (per-machine = elevated), so HKLM writes succeed.
+
+    Windows 11 UserChoice hash validation requires:
+      1. ProgId in HKLM\SOFTWARE\Classes  — so the hash validator can find us
+      2. App Paths entry                  — the hash is computed from the exe
+                                            path found here; without it Windows
+                                            silently reverts UserChoice
+      3. Capabilities + RegisteredApplications — to appear in Default Apps UI
+
+    [INSTALLDIR] is an MSI property that expands to the install directory with
+    a trailing backslash (e.g. "C:\Program Files\Link Opener\").
+    $(var.JpAppName) is substituted at WiX compile time to "Link Opener".
+  -->
+  <Fragment>
+    <ComponentGroup Id="HklmBrowserRegistration" Directory="TARGETDIR">
+
+      <!-- 1. ProgId: HKLM\SOFTWARE\Classes\LinkOpener.URL -->
+      <Component Id="HklmProgId" Guid="{A3B2C1D0-E4F5-6A7B-8C9D-0E1F2A3B4C5D}">
+        <RegistryValue Root="HKLM" KeyPath="yes"
+            Key="SOFTWARE\Classes\LinkOpener.URL"
+            Type="string" Value="$(var.JpAppName) URL Handler" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Classes\LinkOpener.URL\DefaultIcon"
+            Type="string" Value="[INSTALLDIR]$(var.JpAppName).exe,0" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Classes\LinkOpener.URL\Application"
+            Name="AppUserModelId" Type="string" Value="LinkOpener" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Classes\LinkOpener.URL\Application"
+            Name="ApplicationName" Type="string" Value="$(var.JpAppName)" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Classes\LinkOpener.URL\Application"
+            Name="ApplicationDescription" Type="string"
+            Value="Pick which browser opens each link" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Classes\LinkOpener.URL\Application"
+            Name="ApplicationIcon" Type="string"
+            Value="[INSTALLDIR]$(var.JpAppName).exe,0" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Classes\LinkOpener.URL\shell\open\command"
+            Type="string"
+            Value="&quot;[INSTALLDIR]$(var.JpAppName).exe&quot; &quot;%1&quot;" />
+      </Component>
+
+      <!-- 2. StartMenuInternet capabilities + RegisteredApplications atom -->
+      <Component Id="HklmCapabilities" Guid="{5F6E7D8C-9B0A-1C2D-3E4F-5A6B7C8D9E0F}">
+        <RegistryValue Root="HKLM" KeyPath="yes"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener"
+            Type="string" Value="$(var.JpAppName)" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\DefaultIcon"
+            Type="string" Value="[INSTALLDIR]$(var.JpAppName).exe,0" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\Capabilities"
+            Name="ApplicationName" Type="string" Value="$(var.JpAppName)" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\Capabilities"
+            Name="ApplicationDescription" Type="string"
+            Value="Pick which browser opens each link" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\Capabilities"
+            Name="ApplicationIcon" Type="string"
+            Value="[INSTALLDIR]$(var.JpAppName).exe,0" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\Capabilities\URLAssociations"
+            Name="http" Type="string" Value="LinkOpener.URL" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\Capabilities\URLAssociations"
+            Name="https" Type="string" Value="LinkOpener.URL" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\InstallInfo"
+            Name="IconsVisible" Type="integer" Value="1" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Clients\StartMenuInternet\LinkOpener\shell\open\command"
+            Type="string"
+            Value="&quot;[INSTALLDIR]$(var.JpAppName).exe&quot;" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\RegisteredApplications"
+            Name="LinkOpener" Type="string"
+            Value="Software\Clients\StartMenuInternet\LinkOpener\Capabilities" />
+      </Component>
+
+      <!--
+        3. App Paths — required for Windows 11 UserChoice hash validation.
+           The hash is computed from (user SID + exe path from App Paths +
+           protocol + ProgId + date). Without this key the hash fails and
+           Windows silently reverts UserChoice to the previous browser.
+      -->
+      <Component Id="HklmAppPaths" Guid="{9E8D7C6B-5A4B-3C2D-1E0F-9A8B7C6D5E4F}">
+        <RegistryValue Root="HKLM" KeyPath="yes"
+            Key="SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$(var.JpAppName).exe"
+            Type="string" Value="[INSTALLDIR]$(var.JpAppName).exe" />
+        <RegistryValue Root="HKLM"
+            Key="SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$(var.JpAppName).exe"
+            Name="Path" Type="string" Value="[INSTALLDIR]" />
+      </Component>
+
+    </ComponentGroup>
+  </Fragment>
+
+</Wix>

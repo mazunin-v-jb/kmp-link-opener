@@ -4,14 +4,14 @@ import dev.hackathon.linkopener.platform.DefaultBrowserService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+
 /**
- * Reads `HKCU\…\UserChoice\ProgId` to find out which app currently
- * handles HTTP/HTTPS links, and compares against our registered
- * ProgId. While the MSI installer doesn't yet register
- * [OWN_PROG_ID] (W5 in `ai_stages/07_windows_support/plan.md`), this
- * always reports "not default" — same observable behaviour as before
- * the read was wired, but with the right shape for when registration
- * lands.
+ * Uses `AssocQueryStringW` (Shlwapi) to find out which app currently
+ * handles HTTP/HTTPS links, and compares against our registered ProgId.
+ * This is the same API Windows itself uses when resolving clicked links,
+ * so it reflects the true effective default — unlike reading UserChoice
+ * directly, it isn't fooled by Chrome's elevation service resetting the
+ * raw registry key.
  *
  * `openSystemSettings` deep-links to `ms-settings:defaultapps` —
  * Settings → Apps → Default apps. Per Microsoft's UX guidelines,
@@ -26,17 +26,22 @@ import kotlinx.coroutines.withContext
  * UI's manual refresh button covers the gap.
  */
 class WindowsDefaultBrowserService(
-    private val registry: RegistryReader = RegistryReader(),
+    private val progIdResolver: (protocol: String) -> String? = ::queryProtocolProgId,
 ) : DefaultBrowserService {
 
     override val canOpenSystemSettings: Boolean = true
 
     override suspend fun isDefaultBrowser(): Boolean = withContext(Dispatchers.IO) {
-        val httpProgId = registry.queryValue(USER_CHOICE_HTTP, "ProgId") ?: return@withContext false
-        // Equality is the right comparison: ProgId values are atoms
-        // (`ChromeHTML`, `MSEdgeHTM`, our `LinkOpener.URL`), case-
-        // insensitive in Windows but reg.exe preserves casing.
-        httpProgId.equals(OWN_PROG_ID, ignoreCase = true)
+        val progId = progIdResolver("http") ?: return@withContext false
+        // AssocQueryStringW can return either value depending on how Windows
+        // resolves the association:
+        //  - OWN_PROG_ID ("LinkOpener.URL") when UserChoice is intact and
+        //    points to our registered ProgId class.
+        //  - OWN_START_MENU_KEY ("LinkOpener") when Chrome's elevation service
+        //    has reset UserChoice and Windows falls back to resolving via
+        //    the StartMenuInternet sub-key (our HKCU/HKLM Capabilities entry).
+        progId.equals(OWN_PROG_ID, ignoreCase = true) ||
+            progId.equals(WindowsBrowserDiscovery.OWN_START_MENU_KEY, ignoreCase = true)
     }
 
     override suspend fun openSystemSettings(): Boolean = withContext(Dispatchers.IO) {
@@ -50,18 +55,9 @@ class WindowsDefaultBrowserService(
     }
 
     companion object {
-        // The ProgId the MSI installer (stage W5) will register for our
-        // app under HKLM\SOFTWARE\Classes\<this>. Must match whatever
-        // the installer ultimately writes — kept here as a constant so
-        // both the installer and the runtime read the same value.
+        // The ProgId registered in HKCU/HKLM\SOFTWARE\Classes\<this> and in
+        // URLAssociations. When UserChoice is intact this is what AssocQueryStringW
+        // returns; used by WindowsHandlerRegistration to name the ProgId class.
         const val OWN_PROG_ID = "LinkOpener.URL"
-
-        // HKCU\…\UserChoice is the per-user "which app handles http"
-        // record set by the Settings → Default apps UI. We read the
-        // `http` association; `https` is conventionally the same app
-        // but we only check `http` since Windows 11's Settings flow
-        // forces them to match.
-        private const val USER_CHOICE_HTTP =
-            "HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice"
     }
 }

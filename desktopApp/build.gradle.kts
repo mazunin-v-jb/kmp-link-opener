@@ -243,6 +243,44 @@ tasks.register<Jar>("packageWindowsUberJar") {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Windows MSI: HKLM browser-registration entries via post-build MSI patching
+// ---------------------------------------------------------------------------
+// jpackage (JDK 21) generates its WiX XML programmatically and ignores files
+// placed in --resource-dir, so we cannot inject HKLM Components via a custom
+// main.wxs template. Instead we patch the MSI database directly after
+// packageMsi completes, using the Windows Installer COM API (PowerShell).
+//
+// The patching script (src/windows/patch-msi-hklm.ps1) adds three Components
+// to HKLM: ProgId, Capabilities/RegisteredApplications, and App Paths.
+// App Paths is required for Windows 11 UserChoice hash validation — without it
+// Windows silently reverts the default-browser setting every time the user
+// tries to set Link Opener as default in Settings.
+//
+// Run `./gradlew :desktopApp:patchMsiHklm` to build + patch in one step.
+// ---------------------------------------------------------------------------
+afterEvaluate {
+    tasks.findByName("packageMsi")?.let { packageMsiTask ->
+        val msiFile = layout.buildDirectory.file(
+            "compose/binaries/main/msi/$composePackageName-$composePackageVersion.msi",
+        ).get().asFile
+        val patchScript = project.file("src/windows/patch-msi-hklm.ps1")
+
+        tasks.register<Exec>("patchMsiHklm") {
+            group = "compose desktop"
+            description = "Patches HKLM browser-registration entries into the MSI (run after packageMsi)."
+            dependsOn(packageMsiTask)
+            commandLine(
+                "powershell", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                "-File", patchScript.absolutePath,
+                "-MsiPath", msiFile.absolutePath,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 if (notarizationProfile != null) {
     val dmgFile = layout.buildDirectory.file(
         "compose/binaries/main/dmg/$composePackageName-$composePackageVersion.dmg",

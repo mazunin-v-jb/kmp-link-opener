@@ -36,6 +36,7 @@ import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.platform.LinkLauncher
 import dev.hackathon.linkopener.platform.PlatformFactory
 import dev.hackathon.linkopener.platform.UrlReceiver
+import dev.hackathon.linkopener.platform.windows.WindowsBrowserDiscovery
 import dev.hackathon.linkopener.ui.picker.PickerCoordinator
 import dev.hackathon.linkopener.ui.settings.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -59,10 +60,17 @@ class AppContainer {
     private val settingsStore: Settings = Settings()
 
     // Must match nativeDistributions.macOS.bundleID in desktopApp/build.gradle.kts.
-    // Used both to exclude ourselves from the discovered-browsers list (so picking
-    // "Link Opener" as the handler can't loop URLs back into our OpenURIHandler)
-    // and to recognise ourselves when reading the system's default-browser binding.
+    // Used to recognise ourselves when reading the system's default-browser binding
+    // and to block manually adding ourselves in AddManualBrowserUseCase.
     private val ownBundleId = "dev.hackathon.linkopener"
+
+    // The bundleId value our app gets when Windows discovery scans
+    // StartMenuInternet — that registry sub-key is what WindowsBrowserDiscovery
+    // sets as bundleId, so the macOS reverse-DNS id never matches there.
+    private val selfBundleIdForDiscovery: String = when (currentOs) {
+        HostOs.Windows -> WindowsBrowserDiscovery.OWN_START_MENU_KEY
+        else -> ownBundleId
+    }
 
     private val autoStartManager: AutoStartManager = PlatformFactory.createAutoStartManager()
     private val browserDiscovery: BrowserDiscovery = PlatformFactory.createBrowserDiscovery()
@@ -118,7 +126,7 @@ class AppContainer {
     private val systemLanguageTag: String = java.util.Locale.getDefault().language
 
     val discoverBrowsersUseCase: DiscoverBrowsersUseCase =
-        DiscoverBrowsersUseCase(browserRepository, selfBundleId = ownBundleId)
+        DiscoverBrowsersUseCase(browserRepository, selfBundleId = selfBundleIdForDiscovery)
     val observeIsDefaultBrowserUseCase: ObserveIsDefaultBrowserUseCase =
         ObserveIsDefaultBrowserUseCase(defaultBrowserService)
     val getIsDefaultBrowserUseCase: GetIsDefaultBrowserUseCase =

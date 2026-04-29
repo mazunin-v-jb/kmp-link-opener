@@ -97,6 +97,11 @@ class WindowsBrowserDiscovery(
         const val HKLM_START_MENU_INTERNET = "HKLM\\SOFTWARE\\Clients\\StartMenuInternet"
         const val HKCU_START_MENU_INTERNET = "HKCU\\SOFTWARE\\Clients\\StartMenuInternet"
 
+        // The StartMenuInternet sub-key name we register under (matches
+        // patch-msi-hklm.ps1 → SOFTWARE\Clients\StartMenuInternet\LinkOpener).
+        // Used by DiscoverBrowsersUseCase to filter ourselves out of the list.
+        const val OWN_START_MENU_KEY = "LinkOpener"
+
         /**
          * Strips quotes and any `--` / `-osint` / `%1` style argv
          * suffix that browsers tack onto their `shell\open\command`
