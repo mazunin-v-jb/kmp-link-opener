@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.drop
 fun ApplicationScope.PickerWindow(
     url: String,
     browsers: List<Browser>,
+    icons: Map<String, ImageBitmap>,
     onPick: (Browser) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -79,6 +81,7 @@ fun ApplicationScope.PickerWindow(
             onExpand = {
                 windowState.size = DpSize(PICKER_WIDTH, PICKER_HEIGHT_EXPANDED)
             },
+            icons = icons,
             // Header doubles as a drag handle so users can reposition the
             // popup without a title bar (we run undecorated). WindowDraggableArea
             // is a WindowScope extension, so resolution depends on this lambda

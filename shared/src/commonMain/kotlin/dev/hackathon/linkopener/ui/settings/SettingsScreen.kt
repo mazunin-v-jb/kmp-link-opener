@@ -57,6 +57,11 @@ fun SettingsScreen(
     val browsers by viewModel.browsers.collectAsState()
     val isDefault by viewModel.isDefaultBrowser.collectAsState()
     val manualAddNotice by viewModel.manualAddNotice.collectAsState()
+    // Empty map when icons aren't wired (e.g. unit tests with the no-arg VM
+    // factory) — every row falls back to the letter avatar.
+    val browserIcons by (viewModel.browserIcons
+        ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap()) }
+        ).collectAsState()
     var activeSection by remember { mutableStateOf(NavSection.DefaultBrowser) }
     val snackbarHostState = remember { SnackbarHostState() }
     val nudgeMessage = stringResource(Res.string.nudge_already_running)
@@ -130,6 +135,7 @@ fun SettingsScreen(
                                     manualBrowserIds = settings.manualBrowsers
                                         .mapTo(HashSet()) { BrowserId(it.applicationPath) },
                                     manualAddNotice = manualAddNotice,
+                                    icons = browserIcons,
                                     onToggle = viewModel::onBrowserExclusionToggled,
                                     onMoveUp = viewModel::onMoveBrowserUp,
                                     onMoveDown = viewModel::onMoveBrowserDown,

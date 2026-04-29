@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,6 +69,7 @@ internal fun ExclusionsSection(
     excluded: Set<BrowserId>,
     manualBrowserIds: Set<BrowserId>,
     manualAddNotice: ManualAddNotice?,
+    icons: Map<String, ImageBitmap>,
     onToggle: (BrowserId, Boolean) -> Unit,
     onMoveUp: (BrowserId) -> Unit,
     onMoveDown: (BrowserId) -> Unit,
@@ -89,6 +91,7 @@ internal fun ExclusionsSection(
                 browsers = s.browsers,
                 excluded = excluded,
                 manualBrowserIds = manualBrowserIds,
+                icons = icons,
                 onToggle = onToggle,
                 onMoveUp = onMoveUp,
                 onMoveDown = onMoveDown,
@@ -182,6 +185,7 @@ private fun BrowserList(
     browsers: List<Browser>,
     excluded: Set<BrowserId>,
     manualBrowserIds: Set<BrowserId>,
+    icons: Map<String, ImageBitmap>,
     onToggle: (BrowserId, Boolean) -> Unit,
     onMoveUp: (BrowserId) -> Unit,
     onMoveDown: (BrowserId) -> Unit,
@@ -244,6 +248,7 @@ private fun BrowserList(
                     val absoluteIndex = browsers.indexOf(browser)
                     BrowserRow(
                         browser = browser,
+                        icon = icons[browser.applicationPath],
                         isExcluded = id in excluded,
                         isManual = id in manualBrowserIds,
                         canMoveUp = reorderEnabled && absoluteIndex > 0,
@@ -271,6 +276,7 @@ private fun BrowserList(
 @Composable
 private fun BrowserRow(
     browser: Browser,
+    icon: ImageBitmap?,
     isExcluded: Boolean,
     isManual: Boolean,
     canMoveUp: Boolean,
@@ -287,7 +293,10 @@ private fun BrowserRow(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BrowserAvatar(initial = browser.displayName.firstOrNull()?.uppercase() ?: "?")
+        BrowserAvatar(
+            initial = browser.displayName.firstOrNull()?.uppercase() ?: "?",
+            icon = icon,
+        )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

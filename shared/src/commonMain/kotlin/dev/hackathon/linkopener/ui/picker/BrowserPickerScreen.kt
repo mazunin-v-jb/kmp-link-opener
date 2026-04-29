@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,6 +63,9 @@ fun BrowserPickerScreen(
     browsers: List<Browser>,
     onPick: (Browser) -> Unit,
     onExpand: () -> Unit = {},
+    // Keyed by Browser.applicationPath. Missing key → row falls back to the
+    // letter avatar, matching the look before "browser-icons" landed.
+    icons: Map<String, ImageBitmap> = emptyMap(),
     headerWrapper: @Composable (content: @Composable () -> Unit) -> Unit = { it() },
 ) {
     var expanded by remember(browsers) { mutableStateOf(false) }
@@ -87,11 +91,16 @@ fun BrowserPickerScreen(
             } else if (expanded) {
                 ScrollableBrowserList(
                     browsers = browsers,
+                    icons = icons,
                     onPick = onPick,
                 )
             } else {
                 browsers.take(DEFAULT_VISIBLE_COUNT).forEach { browser ->
-                    BrowserRow(browser = browser, onClick = { onPick(browser) })
+                    BrowserRow(
+                        browser = browser,
+                        icon = icons[browser.applicationPath],
+                        onClick = { onPick(browser) },
+                    )
                 }
                 if (browsers.size > DEFAULT_VISIBLE_COUNT) {
                     ShowAllButton(
@@ -110,6 +119,7 @@ fun BrowserPickerScreen(
 @Composable
 private fun ScrollableBrowserList(
     browsers: List<Browser>,
+    icons: Map<String, ImageBitmap>,
     onPick: (Browser) -> Unit,
 ) {
     val scrollState = rememberScrollState()
@@ -120,7 +130,11 @@ private fun ScrollableBrowserList(
                 .verticalScroll(scrollState),
         ) {
             browsers.forEach { browser ->
-                BrowserRow(browser = browser, onClick = { onPick(browser) })
+                BrowserRow(
+                    browser = browser,
+                    icon = icons[browser.applicationPath],
+                    onClick = { onPick(browser) },
+                )
             }
         }
         VerticalScrollbar(
@@ -167,7 +181,11 @@ private fun Header(url: String) {
 }
 
 @Composable
-private fun BrowserRow(browser: Browser, onClick: () -> Unit) {
+private fun BrowserRow(
+    browser: Browser,
+    icon: ImageBitmap?,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -175,7 +193,11 @@ private fun BrowserRow(browser: Browser, onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BrowserAvatar(initial = browser.displayName.firstOrNull()?.uppercase() ?: "?", bordered = true)
+        BrowserAvatar(
+            initial = browser.displayName.firstOrNull()?.uppercase() ?: "?",
+            bordered = true,
+            icon = icon,
+        )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

@@ -3,6 +3,7 @@ package dev.hackathon.linkopener.ui.picker
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.coroutines.runCatchingNonCancellation
+import dev.hackathon.linkopener.data.BrowserIconRepository
 import dev.hackathon.linkopener.domain.RuleDecision
 import dev.hackathon.linkopener.domain.RuleEngine
 import dev.hackathon.linkopener.domain.applyUserOrder
@@ -20,6 +21,9 @@ class PickerCoordinator(
     private val getSettings: GetSettingsFlowUseCase,
     private val launcher: LinkLauncher,
     private val ruleEngine: RuleEngine,
+    // Optional so tests that don't care about icons can pass `null`. In
+    // production the icon repo is always wired through AppContainer.
+    private val iconRepository: BrowserIconRepository? = null,
     private val scope: CoroutineScope,
     // Failures here are rare but always interesting — the picker is the app's
     // hottest path. Default to stderr so they show up in Console.app even
@@ -53,6 +57,10 @@ class PickerCoordinator(
                 }
                 val available = all.filterNot { it.toBrowserId() in settings.excludedBrowserIds }
                 val ordered = applyUserOrder(available, settings.browserOrder)
+                // Idempotent — repo skips paths that have already been
+                // attempted, so the cost is a no-op once warmed up by
+                // AppContainer's startup discovery dump.
+                iconRepository?.prefetch(scope, ordered.map { it.applicationPath })
                 _state.value = PickerState.Showing(url = url, browsers = ordered)
             }.onFailure {
                 // If discovery blew up, show an empty picker rather than swallowing

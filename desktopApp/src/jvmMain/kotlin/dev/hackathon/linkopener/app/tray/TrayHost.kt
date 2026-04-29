@@ -72,6 +72,7 @@ private fun ApplicationScope.TrayHostBody(
     val appIconPainter = AppIcons.AppLogoV2
 
     val pickerState by container.pickerCoordinator.state.collectAsState()
+    val browserIcons by container.browserIconRepository.icons.collectAsState()
 
     var settingsAnchor by remember { mutableStateOf<WindowPosition?>(null) }
 
@@ -113,6 +114,7 @@ private fun ApplicationScope.TrayHostBody(
             PickerWindow(
                 url = currentPickerState.url,
                 browsers = currentPickerState.browsers,
+                icons = browserIcons,
                 onPick = container.pickerCoordinator::pickBrowser,
                 onDismiss = container.pickerCoordinator::dismiss,
             )

@@ -17,6 +17,7 @@ import dev.hackathon.linkopener.domain.usecase.AddManualBrowserUseCase
 import dev.hackathon.linkopener.domain.usecase.RemoveManualBrowserUseCase
 import dev.hackathon.linkopener.core.model.UrlRule
 import dev.hackathon.linkopener.coroutines.runCatchingNonCancellation
+import dev.hackathon.linkopener.data.BrowserIconRepository
 import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
@@ -46,6 +47,10 @@ class SettingsViewModel(
     private val getIsDefaultBrowser: GetIsDefaultBrowserUseCase,
     private val openDefaultBrowserSettings: OpenDefaultBrowserSettingsUseCase,
     getCanOpenSystemSettings: GetCanOpenSystemSettingsUseCase,
+    // Optional: tests that don't care about icons can skip wiring it. The
+    // VM exposes the repo's icon flow directly so the Settings UI can map
+    // Browser → ImageBitmap by applicationPath.
+    private val iconRepository: BrowserIconRepository? = null,
     private val scope: CoroutineScope,
     // Synchronously flips JVM Locale.getDefault on user language change so any
     // Compose recomposition (in any composition — main or Window
@@ -238,13 +243,24 @@ class SettingsViewModel(
         loadBrowsers(forceRefresh = true)
     }
 
+    /**
+     * Stream of decoded browser icons keyed by `applicationPath`. Hot-replays
+     * to late subscribers so the Settings UI shows already-loaded icons on
+     * first paint and incrementally fills in the rest as they decode.
+     */
+    val browserIcons: StateFlow<Map<String, androidx.compose.ui.graphics.ImageBitmap>>? =
+        iconRepository?.icons
+
     private fun loadBrowsers(forceRefresh: Boolean) {
         scope.launch {
             _browsers.value = BrowsersState.Loading
             _browsers.value = runCatchingNonCancellation {
-                BrowsersState.Loaded(
-                    applyUserOrder(discoverBrowsers(forceRefresh = forceRefresh), settings.value.browserOrder),
-                )
+                val discovered = discoverBrowsers(forceRefresh = forceRefresh)
+                // Idempotent prefetch — already-attempted paths are skipped
+                // inside the repo, so a manual refresh just covers any new
+                // additions (manual-add or new install).
+                iconRepository?.prefetch(scope, discovered.map { it.applicationPath })
+                BrowsersState.Loaded(applyUserOrder(discovered, settings.value.browserOrder))
             }.getOrElse { BrowsersState.Error(it.message ?: "Browser discovery failed") }
         }
     }

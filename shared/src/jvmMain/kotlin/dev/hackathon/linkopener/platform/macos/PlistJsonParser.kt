@@ -36,6 +36,18 @@ open class PlistJsonParser(
     }
 
     /**
+     * Pulls the value of `CFBundleIconFile` out of a plist JSON dump. The
+     * caller resolves it against `Contents/Resources/` (and adds the `.icns`
+     * extension if not present — Apple's spec lets the key omit it). Returns
+     * `null` when the bundle doesn't declare a custom icon (rare for browsers).
+     */
+    open fun parseIconFileName(jsonText: String): String? {
+        val root = runCatching { json.parseToJsonElement(jsonText).jsonObject }.getOrNull()
+            ?: return null
+        return root.string("CFBundleIconFile")
+    }
+
+    /**
      * Returns true iff the plist declares `http` or `https` under
      * `CFBundleURLTypes[].CFBundleURLSchemes` — the same predicate
      * `MacOsBrowserDiscovery` uses to classify auto-discovered apps as

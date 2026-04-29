@@ -4,6 +4,7 @@ import com.russhwolf.settings.Settings
 import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.coroutines.runCatchingNonCancellation
 import dev.hackathon.linkopener.data.AppInfoRepositoryImpl
+import dev.hackathon.linkopener.data.BrowserIconRepository
 import dev.hackathon.linkopener.data.BrowserRepositoryImpl
 import dev.hackathon.linkopener.data.SettingsRepositoryImpl
 import dev.hackathon.linkopener.domain.BrowserMetadataExtractor
@@ -29,6 +30,7 @@ import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.AutoStartManager
 import dev.hackathon.linkopener.platform.BrowserDiscovery
+import dev.hackathon.linkopener.platform.BrowserIconLoader
 import dev.hackathon.linkopener.platform.DefaultBrowserService
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.platform.LinkLauncher
@@ -70,6 +72,7 @@ class AppContainer {
     private val linkLauncher: LinkLauncher = PlatformFactory.createLinkLauncher()
     private val browserMetadataExtractor: BrowserMetadataExtractor =
         PlatformFactory.createBrowserMetadataExtractor()
+    private val browserIconLoader: BrowserIconLoader = PlatformFactory.createBrowserIconLoader()
 
     private val appInfoRepository: AppInfoRepository = AppInfoRepositoryImpl()
     private val settingsRepository: SettingsRepository = SettingsRepositoryImpl(
@@ -79,6 +82,7 @@ class AppContainer {
     )
     private val browserRepository: BrowserRepository =
         BrowserRepositoryImpl(browserDiscovery, settingsRepository)
+    val browserIconRepository: BrowserIconRepository = BrowserIconRepository(browserIconLoader)
 
     val getAppInfoUseCase: GetAppInfoUseCase = GetAppInfoUseCase(appInfoRepository)
     val getSettingsFlowUseCase: GetSettingsFlowUseCase = GetSettingsFlowUseCase(settingsRepository)
@@ -129,6 +133,7 @@ class AppContainer {
         getSettings = getSettingsFlowUseCase,
         launcher = linkLauncher,
         ruleEngine = ruleEngine,
+        iconRepository = browserIconRepository,
         scope = coroutineScope,
     )
 
@@ -159,6 +164,15 @@ class AppContainer {
         coroutineScope.launch {
             runCatchingNonCancellation { discoverBrowsersUseCase() }
                 .onSuccess { browsers ->
+                    // Kick off icon extraction now so settings + picker render
+                    // them on first paint. Each loader call is cheap (one
+                    // FileSystemView.getSystemIcon hop on macOS/Windows or
+                    // one .desktop walk on Linux), but we still want them off
+                    // the main thread.
+                    browserIconRepository.prefetch(
+                        scope = coroutineScope,
+                        applicationPaths = browsers.map { it.applicationPath },
+                    )
                     if (DebugFlags.enabled) {
                         println("Discovered ${browsers.size} browser(s):")
                         browsers.forEach { browser ->
@@ -194,6 +208,7 @@ class AppContainer {
         getIsDefaultBrowser = getIsDefaultBrowserUseCase,
         openDefaultBrowserSettings = openDefaultBrowserSettingsUseCase,
         getCanOpenSystemSettings = getCanOpenSystemSettingsUseCase,
+        iconRepository = browserIconRepository,
         scope = coroutineScope,
         applyLocale = ::applyJvmLocale,
     )
