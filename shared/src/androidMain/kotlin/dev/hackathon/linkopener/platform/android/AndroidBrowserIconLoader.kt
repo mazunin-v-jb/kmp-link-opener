@@ -30,7 +30,10 @@ class AndroidBrowserIconLoader(
     }.getOrNull()
 }
 
-private fun Drawable.toPngBytes(size: Int): ByteArray {
+// Internal so the unit test can drive the raster path directly with a
+// hand-rolled Drawable, sidestepping the PackageManager.getApplicationIcon
+// hop (which Robolectric doesn't reliably resolve for framework drawables).
+internal fun Drawable.toPngBytes(size: Int): ByteArray {
     val bitmap: Bitmap = if (this is BitmapDrawable && this.bitmap != null) {
         // Already-rasterised drawable — reuse its bitmap, scaling only if
         // the source is larger than we asked for (no point upscaling).

@@ -1,0 +1,121 @@
+name: Release
+
+# Tag-triggered. Push a `v*` tag (e.g. `git push origin v1.0.19`) → build
+# all four targets in parallel → publish a GitHub Release with native
+# installers + APK attached. Default `git push origin main` does NOT push
+# tags (that needs `--tags` or an explicit tagname), so this workflow is
+# dormant until you opt in.
+#
+# `softprops/action-gh-release@v2` reads the tag from `github.ref_name`
+# automatically — no need to set tag/name manually. Release notes are
+# auto-generated from PRs/commits since the previous tag.
+#
+# Builds are unsigned. Production-grade signed releases (Apple notarization,
+# Windows Authenticode, Android upload key) are separate keystore-handling
+# tracks layered on top of this skeleton.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  tests:
+    name: Verify (check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run check
+        run: ./gradlew check
+
+  linux:
+    name: Linux DEB
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :desktopApp:packageDeb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: desktopApp/build/compose/binaries/main/deb/*.deb
+          if-no-files-found: error
+
+  macos:
+    name: macOS DMG
+    needs: tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :desktopApp:packageDmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: desktopApp/build/compose/binaries/main/dmg/*.dmg
+          if-no-files-found: error
+
+  windows:
+    name: Windows MSI
+    needs: tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :desktopApp:packageMsi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: desktopApp/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+
+  android:
+    name: Android APK
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :androidApp:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: androidApp/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [linux, macos, windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

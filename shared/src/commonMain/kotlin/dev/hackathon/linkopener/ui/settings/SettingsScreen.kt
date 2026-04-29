@@ -1,10 +1,12 @@
 package dev.hackathon.linkopener.ui.settings
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.platform.HostOs
+import dev.hackathon.linkopener.ui.settings.components.BottomNavBar
 import dev.hackathon.linkopener.ui.settings.components.NotDefaultBanner
 import dev.hackathon.linkopener.ui.settings.components.SettingsTopAppBar
 import dev.hackathon.linkopener.ui.settings.components.Sidebar
@@ -76,7 +79,12 @@ fun SettingsScreen(
     // Compose's smart-skipping leaves TopAppBar / Sidebar / banner stuck on
     // the previous locale until something else invalidates them.
     CompositionLocalProvider(LocalAppLocale provides settings.language.name) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            // 600dp is Material's typical "compact / medium" breakpoint —
+            // below this we're on a phone in portrait and the 240dp sidebar
+            // would eat most of the available width. Above, classic
+            // desktop layout.
+            val compact = maxWidth < 600.dp
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background,
@@ -93,66 +101,52 @@ fun SettingsScreen(
                             onSelectDefaultSection = { activeSection = NavSection.DefaultBrowser },
                         )
                     }
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        Sidebar(
-                            appVersion = appVersion,
-                            activeSection = activeSection,
-                            onSelect = { activeSection = it },
-                        )
+                    if (compact) {
+                        // Compact: content fills the row above a bottom nav.
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxHeight(),
+                                .fillMaxWidth(),
                         ) {
-                            // Plain `when` instead of Crossfade — Crossfade caches the
-                            // content lambda per targetState, so when only the locale
-                            // changed (activeSection unchanged) the lambda wasn't
-                            // re-invoked and the visible section kept its old strings
-                            // until the user navigated. With direct rendering each
-                            // SettingsScreen recomposition (including the one
-                            // triggered by settings.language flow) re-runs the active
-                            // branch and stringResource() picks up the new locale.
-                            when (activeSection) {
-                                NavSection.DefaultBrowser -> DefaultBrowserSection(
-                                    currentOs = currentOs,
-                                    isDefault = isDefault,
-                                    canOpenSettings = viewModel.canOpenSystemSettings,
-                                    onOpenSettings = viewModel::openSystemSettings,
-                                )
-                                NavSection.Appearance ->
-                                    AppearanceSection(settings.theme, viewModel::onThemeSelected)
-                                NavSection.Language ->
-                                    LanguageSection(settings.language, viewModel::onLanguageSelected)
-                                NavSection.System -> SystemSection(
-                                    autoStart = settings.autoStartEnabled,
-                                    onAutoStartChange = viewModel::onAutoStartChanged,
-                                    showBrowserProfiles = settings.showBrowserProfiles,
-                                    onShowBrowserProfilesChange = viewModel::onShowBrowserProfilesChanged,
-                                )
-                                NavSection.Exclusions -> ExclusionsSection(
-                                    browsersState = browsers,
-                                    excluded = settings.excludedBrowserIds,
-                                    manualBrowserIds = settings.manualBrowsers
-                                        .mapTo(HashSet()) { BrowserId(it.applicationPath) },
+                            ActiveSection(
+                                activeSection = activeSection,
+                                viewModel = viewModel,
+                                settings = settings,
+                                browsers = browsers,
+                                browserIcons = browserIcons,
+                                manualAddNotice = manualAddNotice,
+                                isDefault = isDefault,
+                                currentOs = currentOs,
+                                onAddBrowserClick = onAddBrowserClick,
+                            )
+                        }
+                        BottomNavBar(
+                            activeSection = activeSection,
+                            onSelect = { activeSection = it },
+                        )
+                    } else {
+                        // Desktop / tablet: 240dp sidebar + content.
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            Sidebar(
+                                appVersion = appVersion,
+                                activeSection = activeSection,
+                                onSelect = { activeSection = it },
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            ) {
+                                ActiveSection(
+                                    activeSection = activeSection,
+                                    viewModel = viewModel,
+                                    settings = settings,
+                                    browsers = browsers,
+                                    browserIcons = browserIcons,
                                     manualAddNotice = manualAddNotice,
-                                    icons = browserIcons,
-                                    onToggle = viewModel::onBrowserExclusionToggled,
-                                    onReorder = viewModel::onReorderBrowsers,
-                                    onRemoveManual = viewModel::onRemoveManualBrowser,
+                                    isDefault = isDefault,
+                                    currentOs = currentOs,
                                     onAddBrowserClick = onAddBrowserClick,
-                                    onDismissManualAddNotice = viewModel::dismissManualAddNotice,
-                                    onRetry = viewModel::refreshBrowsers,
-                                )
-                                NavSection.Rules -> RulesSection(
-                                    rules = settings.rules,
-                                    availableBrowsers = (browsers as? BrowsersState.Loaded)
-                                        ?.browsers
-                                        ?: emptyList(),
-                                    onAddRule = viewModel::onAddRule,
-                                    onRemoveRule = viewModel::onRemoveRule,
-                                    onMoveRule = viewModel::onMoveRule,
-                                    onUpdateRulePattern = viewModel::onUpdateRulePattern,
-                                    onUpdateRuleBrowser = viewModel::onUpdateRuleBrowser,
                                 )
                             }
                         }
@@ -166,5 +160,74 @@ fun SettingsScreen(
                     .padding(16.dp),
             )
         }
+    }
+}
+
+/**
+ * The body of the active settings section. Extracted so the compact
+ * (BottomNavBar) and wide (Sidebar) layouts share the same per-section
+ * dispatch table — only the surrounding chrome differs.
+ *
+ * Plain `when` instead of Crossfade — Crossfade caches the content lambda
+ * per targetState, so when only the locale changed (activeSection
+ * unchanged) the lambda wasn't re-invoked and the visible section kept
+ * its old strings until the user navigated. Direct rendering means each
+ * SettingsScreen recomposition re-runs the active branch and
+ * stringResource() picks up the new locale.
+ */
+@Composable
+private fun ActiveSection(
+    activeSection: NavSection,
+    viewModel: SettingsViewModel,
+    settings: dev.hackathon.linkopener.core.model.AppSettings,
+    browsers: BrowsersState,
+    browserIcons: Map<String, androidx.compose.ui.graphics.ImageBitmap>,
+    manualAddNotice: ManualAddNotice?,
+    isDefault: Boolean,
+    currentOs: HostOs,
+    onAddBrowserClick: () -> Unit,
+) {
+    when (activeSection) {
+        NavSection.DefaultBrowser -> DefaultBrowserSection(
+            currentOs = currentOs,
+            isDefault = isDefault,
+            canOpenSettings = viewModel.canOpenSystemSettings,
+            onOpenSettings = viewModel::openSystemSettings,
+        )
+        NavSection.Appearance ->
+            AppearanceSection(settings.theme, viewModel::onThemeSelected)
+        NavSection.Language ->
+            LanguageSection(settings.language, viewModel::onLanguageSelected)
+        NavSection.System -> SystemSection(
+            autoStart = settings.autoStartEnabled,
+            onAutoStartChange = viewModel::onAutoStartChanged,
+            showBrowserProfiles = settings.showBrowserProfiles,
+            onShowBrowserProfilesChange = viewModel::onShowBrowserProfilesChanged,
+        )
+        NavSection.Exclusions -> ExclusionsSection(
+            browsersState = browsers,
+            excluded = settings.excludedBrowserIds,
+            manualBrowserIds = settings.manualBrowsers
+                .mapTo(HashSet()) { BrowserId(it.applicationPath) },
+            manualAddNotice = manualAddNotice,
+            icons = browserIcons,
+            onToggle = viewModel::onBrowserExclusionToggled,
+            onReorder = viewModel::onReorderBrowsers,
+            onRemoveManual = viewModel::onRemoveManualBrowser,
+            onAddBrowserClick = onAddBrowserClick,
+            onDismissManualAddNotice = viewModel::dismissManualAddNotice,
+            onRetry = viewModel::refreshBrowsers,
+        )
+        NavSection.Rules -> RulesSection(
+            rules = settings.rules,
+            availableBrowsers = (browsers as? BrowsersState.Loaded)
+                ?.browsers
+                ?: emptyList(),
+            onAddRule = viewModel::onAddRule,
+            onRemoveRule = viewModel::onRemoveRule,
+            onMoveRule = viewModel::onMoveRule,
+            onUpdateRulePattern = viewModel::onUpdateRulePattern,
+            onUpdateRuleBrowser = viewModel::onUpdateRuleBrowser,
+        )
     }
 }

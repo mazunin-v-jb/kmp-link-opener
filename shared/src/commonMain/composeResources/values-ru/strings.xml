@@ -104,4 +104,10 @@
     <string name="tooltip_help_easter">ПАМАГИТЕ!!</string>
     <string name="tooltip_close">Закрыть окно настроек, не завершая работу</string>
     <string name="tooltip_drag_to_reorder">Потяни, чтобы поменять порядок</string>
+
+    <string-array name="default_browser_instructions_android">
+        <item>Нажми кнопку ниже — Android покажет системный диалог "Сделать Link Opener браузером по умолчанию?".</item>
+        <item>Если диалог не появился (на старых версиях Android), откроется Настройки → Приложения → Приложения по умолчанию.</item>
+        <item>В разделе "Браузер" выбери Link Opener.</item>
+    </string-array>
 </resources>

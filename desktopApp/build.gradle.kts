@@ -243,6 +243,66 @@ tasks.register<Jar>("packageWindowsUberJar") {
     }
 }
 
+// --- Cross-platform Linux fat-JAR -------------------------------------------
+// Same shape as the Windows one above, but bundles `skiko-awt-runtime-linux-x64`
+// (Skia's `libskiko-linux-x64.so`) instead of the Windows DLL. Runnable on any
+// glibc 2.31+ x86_64 Linux with JDK 17+ on PATH:
+//
+//   java -jar link-opener-<ver>-linux-x64.jar
+//
+// To add Linux arm64 support (Asahi on M-Macs, RPi, Pinebook): add a sibling
+// `linuxUberRuntime(compose.desktop.linux_arm64)` line in the `dependencies`
+// block — Skiko detects the host arch at runtime and loads the matching `.so`.
+// We keep it x64-only by default to mirror the Windows fat-JAR's footprint.
+
+val linuxUberRuntime: Configuration by configurations.creating
+
+dependencies {
+    linuxUberRuntime(project(":shared"))
+    linuxUberRuntime(compose.desktop.linux_x64)
+    linuxUberRuntime(libs.compose.material3)
+    linuxUberRuntime(libs.compose.resources)
+    linuxUberRuntime(libs.kotlinx.coroutines.swing)
+    linuxUberRuntime(libs.kotlinx.serialization.json)
+    linuxUberRuntime(libs.multiplatformSettings)
+    linuxUberRuntime(libs.jna)
+}
+
+tasks.register<Jar>("packageLinuxUberJar") {
+    group = "compose desktop"
+    description = "Builds a Linux-runnable fat-JAR (cross-compiled from any host)."
+    notCompatibleWithConfigurationCache("Uses zipTree() over a resolved Configuration")
+    archiveBaseName.set("link-opener")
+    archiveClassifier.set("linux-x64")
+    archiveVersion.set(composePackageVersion)
+
+    manifest {
+        attributes["Main-Class"] = "dev.hackathon.linkopener.app.MainKt"
+        attributes["Implementation-Version"] = composePackageVersion
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude(
+        "META-INF/*.SF",
+        "META-INF/*.DSA",
+        "META-INF/*.RSA",
+        "META-INF/versions/*/module-info.class",
+        "module-info.class",
+    )
+
+    val jvmJarTask = tasks.named<Jar>("jvmJar")
+    dependsOn(jvmJarTask)
+    from(jvmJarTask.flatMap { it.archiveFile }.map { zipTree(it) })
+
+    linuxUberRuntime.resolve().forEach { file ->
+        if (file.isDirectory) {
+            from(file)
+        } else if (file.name.endsWith(".jar")) {
+            from(zipTree(file))
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Windows MSI: HKLM browser-registration entries via post-build MSI patching
 // ---------------------------------------------------------------------------
@@ -280,6 +340,7 @@ afterEvaluate {
 }
 
 // ---------------------------------------------------------------------------
+
 
 if (notarizationProfile != null) {
     val dmgFile = layout.buildDirectory.file(

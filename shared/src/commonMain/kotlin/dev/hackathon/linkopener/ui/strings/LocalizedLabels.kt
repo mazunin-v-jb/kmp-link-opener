@@ -5,6 +5,7 @@ import dev.hackathon.linkopener.core.model.AppLanguage
 import dev.hackathon.linkopener.core.model.AppTheme
 import dev.hackathon.linkopener.platform.HostOs
 import kmp_link_opener.shared.generated.resources.Res
+import kmp_link_opener.shared.generated.resources.default_browser_instructions_android
 import kmp_link_opener.shared.generated.resources.default_browser_instructions_linux
 import kmp_link_opener.shared.generated.resources.default_browser_instructions_macos
 import kmp_link_opener.shared.generated.resources.default_browser_instructions_windows
@@ -39,5 +40,6 @@ fun defaultBrowserInstructions(os: HostOs): List<String> = when (os) {
     HostOs.MacOs -> stringArrayResource(Res.array.default_browser_instructions_macos)
     HostOs.Windows -> stringArrayResource(Res.array.default_browser_instructions_windows)
     HostOs.Linux -> stringArrayResource(Res.array.default_browser_instructions_linux)
+    HostOs.Android -> stringArrayResource(Res.array.default_browser_instructions_android)
     HostOs.Other -> listOf(stringResource(Res.string.default_browser_unsupported_os))
 }

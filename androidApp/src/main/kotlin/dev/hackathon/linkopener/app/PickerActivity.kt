@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.hackathon.linkopener.platform.android.extractUrlFromIntentParts
 import dev.hackathon.linkopener.ui.picker.BrowserPickerScreen
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.theme.LinkOpenerTheme
@@ -113,7 +114,33 @@ class PickerActivity : ComponentActivity() {
     }
 
     private fun forwardIntent(intent: Intent?) {
-        val url = intent?.dataString ?: return
+        val url = extractUrlFromIntentParts(
+            action = intent?.action,
+            dataString = intent?.dataString?.let(::unwrapIntentScheme),
+            extraText = intent?.getStringExtra(Intent.EXTRA_TEXT),
+        )
+        if (url == null) {
+            // Defensive: if PickerActivity gets started without a usable
+            // URL we just bail. Better than leaving a transparent shell
+            // activity hanging on top of whatever the user was doing.
+            finish()
+            return
+        }
         container.urlReceiver.submit(url)
+    }
+
+    /**
+     * Some apps construct deep-link entries as
+     * `intent://example.com/path#Intent;scheme=https;…;end` — Android's
+     * intent-uri spec. The manifest catches them via the `intent` scheme
+     * filter; here we parse out the underlying URI so the picker sees a
+     * normal http(s) URL. Failure / non-intent strings pass through
+     * unchanged.
+     */
+    private fun unwrapIntentScheme(s: String): String {
+        if (!s.startsWith("intent:", ignoreCase = true)) return s
+        return runCatching {
+            Intent.parseUri(s, Intent.URI_INTENT_SCHEME).dataString
+        }.getOrNull() ?: s
     }
 }

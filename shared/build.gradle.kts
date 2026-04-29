@@ -123,7 +123,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().con
 // version to match the JVM target.
 android {
     namespace = "dev.hackathon.linkopener.shared"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         minSdk = 26
     }

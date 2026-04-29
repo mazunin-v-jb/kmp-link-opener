@@ -57,6 +57,15 @@ class PickerCoordinator(
                 }
                 val available = all.filterNot { it.toBrowserId() in settings.excludedBrowserIds }
                 val ordered = applyUserOrder(available, settings.browserOrder)
+                // No-choice short-circuit: if exclusions/discovery left exactly
+                // one browser, the picker would just be a single-row "tap me"
+                // dialog — skip it and launch directly. Empty list still falls
+                // through to the empty Showing state so the user sees an
+                // explanation instead of nothing.
+                if (ordered.size == 1) {
+                    launcher.openIn(ordered.single(), url)
+                    return@runCatchingNonCancellation
+                }
                 // Idempotent — repo skips paths that have already been
                 // attempted, so the cost is a no-op once warmed up by
                 // AppContainer's startup discovery dump.
