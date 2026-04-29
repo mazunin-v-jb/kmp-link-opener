@@ -118,28 +118,34 @@ class PickerCoordinatorTest {
     fun excludingOneInstallationKeepsAnotherWithSameBundleId() = runTest {
         // Two installs of Chrome (parallel versions) share a bundleId but live
         // at different paths; excluding one must not exclude the other.
+        // Post-exclusion the available list is just [chrome2], so the
+        // auto-launch short-circuit fires — assert that the launcher saw the
+        // *non-excluded* installation rather than the picker showing it.
         val chrome2 = Browser("com.google.Chrome", "Chrome", "/Applications/Chrome 2.app", "126")
         val settings = AppSettings(excludedBrowserIds = setOf(chrome.toBrowserId()))
+        val launcher = RecordingLauncher()
         val coord = newCoordinator(
             scope = this,
             browsers = listOf(chrome, chrome2),
             settings = settings,
+            launcher = launcher,
         )
 
         coord.handleIncomingUrl("https://example.com")
         testScheduler.advanceUntilIdle()
 
-        val state = coord.state.value
-        assertIs<PickerState.Showing>(state)
-        assertEquals(listOf(chrome2), state.browsers)
+        assertEquals(PickerState.Hidden, coord.state.value)
+        assertEquals(listOf(chrome2 to "https://example.com"), launcher.calls)
     }
 
     @Test
     fun pickBrowserCallsLauncherAndReturnsToHidden() = runTest {
         val launcher = RecordingLauncher()
+        // Two browsers so the picker actually shows — a one-browser list
+        // would auto-launch and never reach the pickBrowser path.
         val coord = newCoordinator(
             scope = this,
-            browsers = listOf(safari),
+            browsers = listOf(safari, chrome),
             launcher = launcher,
         )
 
@@ -168,9 +174,11 @@ class PickerCoordinatorTest {
     @Test
     fun dismissReturnsToHiddenWithoutLaunching() = runTest {
         val launcher = RecordingLauncher()
+        // Two browsers so the picker actually shows; a one-browser list would
+        // auto-launch and there'd be nothing to dismiss.
         val coord = newCoordinator(
             scope = this,
-            browsers = listOf(safari),
+            browsers = listOf(safari, chrome),
             launcher = launcher,
         )
 
@@ -185,7 +193,9 @@ class PickerCoordinatorTest {
 
     @Test
     fun secondUrlReplacesFirstWhileShowing() = runTest {
-        val coord = newCoordinator(scope = this, browsers = listOf(safari))
+        // Two browsers so the picker stays Showing across both URLs (a
+        // one-browser list would auto-launch each one immediately).
+        val coord = newCoordinator(scope = this, browsers = listOf(safari, chrome))
 
         coord.handleIncomingUrl("https://first.example")
         testScheduler.advanceUntilIdle()
@@ -195,6 +205,45 @@ class PickerCoordinatorTest {
         val state = coord.state.value
         assertIs<PickerState.Showing>(state)
         assertEquals("https://second.example", state.url)
+    }
+
+    @Test
+    fun singleAvailableBrowserAutoLaunchesWithoutShowingPicker() = runTest {
+        // No-choice short-circuit: one discovered browser, no exclusions —
+        // the picker would be a single-row "tap me" dialog, so we skip it
+        // and launch directly.
+        val launcher = RecordingLauncher()
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari),
+            launcher = launcher,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(PickerState.Hidden, coord.state.value)
+        assertEquals(listOf(safari to "https://example.com"), launcher.calls)
+    }
+
+    @Test
+    fun exclusionsReducingToOneBrowserAlsoAutoLaunches() = runTest {
+        // Same short-circuit, just reached via exclusions instead of a thin
+        // discovery list — two browsers installed, user excluded one, only
+        // one survives → launch directly.
+        val launcher = RecordingLauncher()
+        val coord = newCoordinator(
+            scope = this,
+            browsers = listOf(safari, chrome),
+            settings = AppSettings(excludedBrowserIds = setOf(chrome.toBrowserId())),
+            launcher = launcher,
+        )
+
+        coord.handleIncomingUrl("https://example.com")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(PickerState.Hidden, coord.state.value)
+        assertEquals(listOf(safari to "https://example.com"), launcher.calls)
     }
 
     @Test
@@ -234,10 +283,14 @@ class PickerCoordinatorTest {
     fun ruleMatchingExcludedBrowserFallsThroughToPicker() = runTest {
         // Decision #4: exclusion wins. Rule points at Firefox but Firefox
         // is excluded; engine skips and the picker shows the remaining set.
+        // Three browsers in the discovery list so post-exclusion still has
+        // two — keeps the picker showing rather than tripping the auto-launch
+        // short-circuit, so the assertion stays focused on the rule-vs-
+        // exclusion arbitration this test is named for.
         val launcher = RecordingLauncher()
         val coord = newCoordinator(
             scope = this,
-            browsers = listOf(safari, firefox),
+            browsers = listOf(safari, chrome, firefox),
             settings = AppSettings(
                 excludedBrowserIds = setOf(firefox.toBrowserId()),
                 rules = listOf(
@@ -252,8 +305,8 @@ class PickerCoordinatorTest {
 
         val state = coord.state.value
         assertIs<PickerState.Showing>(state)
-        // Picker shows Safari (Firefox is excluded), launcher untouched.
-        assertEquals(listOf(safari), state.browsers)
+        // Picker shows the surviving pair (Firefox is excluded), launcher untouched.
+        assertEquals(listOf(safari, chrome), state.browsers)
         assertEquals(emptyList(), launcher.calls)
     }
 
@@ -325,15 +378,18 @@ class PickerCoordinatorTest {
     @Test
     fun successfulDiscoveryDoesNotInvokeLogError() = runTest {
         val recorded = mutableListOf<Pair<String, Throwable>>()
+        // Two browsers so the sanity check at the end can assert the picker
+        // actually showed — a one-browser list would auto-launch and leave
+        // state at Hidden, defeating the "happy path completed" probe.
         val coord = newCoordinator(
             scope = this,
-            browsers = listOf(safari),
+            browsers = listOf(safari, chrome),
         )
         // Sanity: handle a URL that goes through the happy path. This
         // coordinator was built without an injected logError, but we can
         // re-verify with one wired in by reaching for the explicit ctor.
         val coord2 = PickerCoordinator(
-            discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(listOf(safari))),
+            discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(listOf(safari, chrome))),
             getSettings = GetSettingsFlowUseCase(InMemorySettingsRepository()),
             launcher = RecordingLauncher(),
             ruleEngine = RuleEngine(),
