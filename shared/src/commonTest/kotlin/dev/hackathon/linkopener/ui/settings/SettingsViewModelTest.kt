@@ -196,6 +196,7 @@ class SettingsViewModelTest {
                 removeManualBrowser = RemoveManualBrowserUseCase(FakeSettingsRepository()),
                 setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(FakeSettingsRepository()),
                 setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(FakeSettingsRepository()),
+                setShowCloseButton = dev.hackathon.linkopener.domain.usecase.SetShowCloseButtonUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
                 getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
@@ -479,6 +480,7 @@ class SettingsViewModelTest {
                 removeManualBrowser = RemoveManualBrowserUseCase(FakeSettingsRepository()),
                 setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(FakeSettingsRepository()),
                 setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(FakeSettingsRepository()),
+                setShowCloseButton = dev.hackathon.linkopener.domain.usecase.SetShowCloseButtonUseCase(FakeSettingsRepository()),
                 discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
                 observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(service),
                 getIsDefaultBrowser = GetIsDefaultBrowserUseCase(service),
@@ -846,6 +848,7 @@ class SettingsViewModelTest {
             removeManualBrowser = RemoveManualBrowserUseCase(repo),
             setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(repo),
             setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(repo),
+            setShowCloseButton = dev.hackathon.linkopener.domain.usecase.SetShowCloseButtonUseCase(repo),
             discoverBrowsers = DiscoverBrowsersUseCase(StaticBrowserRepository(emptyList())),
             observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(FakeDefaultBrowserService()),
             getIsDefaultBrowser = GetIsDefaultBrowserUseCase(FakeDefaultBrowserService()),
@@ -888,6 +891,7 @@ class SettingsViewModelTest {
         removeManualBrowser = RemoveManualBrowserUseCase(repo),
         setRules = dev.hackathon.linkopener.domain.usecase.SetRulesUseCase(repo),
         setShowBrowserProfiles = dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase(repo),
+        setShowCloseButton = dev.hackathon.linkopener.domain.usecase.SetShowCloseButtonUseCase(repo),
         discoverBrowsers = DiscoverBrowsersUseCase(browserRepository),
         observeIsDefaultBrowser = ObserveIsDefaultBrowserUseCase(defaultBrowserService),
         getIsDefaultBrowser = GetIsDefaultBrowserUseCase(defaultBrowserService),
@@ -964,6 +968,10 @@ class SettingsViewModelTest {
 
         override suspend fun setShowBrowserProfiles(enabled: Boolean) {
             _settings.update { it.copy(showBrowserProfiles = enabled) }
+        }
+
+        override suspend fun setShowCloseButton(enabled: Boolean) {
+            _settings.update { it.copy(showCloseButton = enabled) }
         }
     }
 

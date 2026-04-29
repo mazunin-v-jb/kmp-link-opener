@@ -19,10 +19,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import dev.hackathon.linkopener.ui.util.PlatformVerticalScrollbar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import dev.hackathon.linkopener.ui.icons.AppIcons
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +64,9 @@ fun BrowserPickerScreen(
     url: String,
     browsers: List<Browser>,
     onPick: (Browser) -> Unit,
+    // When non-null, a close (×) button is rendered in the header. The caller
+    // (PickerWindow) passes this only when `settings.showCloseButton` is true.
+    onDismiss: (() -> Unit)? = null,
     onExpand: () -> Unit = {},
     // Keyed by Browser.applicationPath. Missing key → row falls back to the
     // letter avatar, matching the look before "browser-icons" landed.
@@ -82,7 +88,7 @@ fun BrowserPickerScreen(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             headerWrapper {
-                Header(url = url)
+                Header(url = url, onDismiss = onDismiss)
             }
 
             if (browsers.isEmpty()) {
@@ -146,30 +152,51 @@ private fun ScrollableBrowserList(
 }
 
 @Composable
-private fun Header(url: String) {
-    Column(
+private fun Header(url: String, onDismiss: (() -> Unit)?) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(
+                start = 16.dp,
+                end = if (onDismiss != null) 4.dp else 16.dp,
+                top = 12.dp,
+                bottom = 12.dp,
+            ),
+        verticalAlignment = Alignment.Top,
     ) {
-        Text(
-            text = stringResource(Res.string.picker_header_open),
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = url,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(Res.string.picker_header_open),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = url,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+            )
+        }
+        if (onDismiss != null) {
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    painter = AppIcons.Close,
+                    contentDescription = "Close",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
     }
     Box(
         modifier = Modifier

@@ -151,5 +151,9 @@ class AddManualBrowserUseCaseTest {
         override suspend fun setShowBrowserProfiles(enabled: Boolean) {
             _settings.update { it.copy(showBrowserProfiles = enabled) }
         }
+
+        override suspend fun setShowCloseButton(enabled: Boolean) {
+            _settings.update { it.copy(showCloseButton = enabled) }
+        }
     }
 }

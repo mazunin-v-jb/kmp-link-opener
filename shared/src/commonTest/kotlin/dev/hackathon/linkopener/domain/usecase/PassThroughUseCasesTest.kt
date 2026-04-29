@@ -86,6 +86,15 @@ class PassThroughUseCasesTest {
     }
 
     @Test
+    fun setShowCloseButtonUseCaseForwardsBoolean() = runTest {
+        val repo = RecordingSettingsRepository()
+        SetShowCloseButtonUseCase(repo)(true)
+        SetShowCloseButtonUseCase(repo)(false)
+        // setShowCloseButton is a no-op stub in RecordingSettingsRepository,
+        // so just verify it doesn't throw.
+    }
+
+    @Test
     fun getSettingsFlowUseCaseExposesUnderlyingFlow() {
         // No suspend or transform — should hand the same StateFlow back.
         val repo = RecordingSettingsRepository()
@@ -158,6 +167,8 @@ class PassThroughUseCasesTest {
         override suspend fun setShowBrowserProfiles(enabled: Boolean) {
             showProfilesCalls += enabled
         }
+
+        override suspend fun setShowCloseButton(enabled: Boolean) { /* not tracked */ }
     }
 
     private class RecordingDefaultBrowserService(

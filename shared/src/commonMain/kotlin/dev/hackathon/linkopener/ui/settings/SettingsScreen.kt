@@ -203,6 +203,8 @@ private fun ActiveSection(
             onAutoStartChange = viewModel::onAutoStartChanged,
             showBrowserProfiles = settings.showBrowserProfiles,
             onShowBrowserProfilesChange = viewModel::onShowBrowserProfilesChanged,
+            showCloseButton = settings.showCloseButton,
+            onShowCloseButtonChange = viewModel::onShowCloseButtonChanged,
         )
         NavSection.Exclusions -> ExclusionsSection(
             browsersState = browsers,

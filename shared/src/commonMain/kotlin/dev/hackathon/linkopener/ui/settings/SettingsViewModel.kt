@@ -22,6 +22,7 @@ import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
 import dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase
+import dev.hackathon.linkopener.domain.usecase.SetShowCloseButtonUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +43,7 @@ class SettingsViewModel(
     private val removeManualBrowser: RemoveManualBrowserUseCase,
     private val setRules: SetRulesUseCase,
     private val setShowBrowserProfiles: SetShowBrowserProfilesUseCase,
+    private val setShowCloseButton: SetShowCloseButtonUseCase,
     private val discoverBrowsers: DiscoverBrowsersUseCase,
     observeIsDefaultBrowser: ObserveIsDefaultBrowserUseCase,
     private val getIsDefaultBrowser: GetIsDefaultBrowserUseCase,
@@ -130,6 +132,10 @@ class SettingsViewModel(
             setShowBrowserProfiles(enabled)
             loadBrowsers(forceRefresh = false)
         }
+    }
+
+    fun onShowCloseButtonChanged(enabled: Boolean) {
+        scope.launch { setShowCloseButton(enabled) }
     }
 
     fun onBrowserExclusionToggled(id: BrowserId, excluded: Boolean) {

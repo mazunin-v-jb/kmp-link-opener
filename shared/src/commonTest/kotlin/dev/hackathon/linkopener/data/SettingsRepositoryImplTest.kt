@@ -339,6 +339,37 @@ class SettingsRepositoryImplTest {
     }
 
     @Test
+    fun showCloseButtonDefaultsFalseWhenAbsent() = runTest {
+        val repo = newRepo()
+        assertEquals(false, repo.settings.value.showCloseButton)
+    }
+
+    @Test
+    fun setShowCloseButtonPersistsAndEmits() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+
+        repo.setShowCloseButton(true)
+
+        assertEquals(true, repo.settings.value.showCloseButton)
+        assertEquals(true, store.getBoolean("settings.showCloseButton", false))
+    }
+
+    @Test
+    fun setShowCloseButtonIsIdempotent() = runTest {
+        val store = FakeSettings()
+        val repo = newRepo(store = store)
+
+        // Default is false; setting false again is a no-op.
+        repo.setShowCloseButton(false)
+        assertEquals(false, repo.settings.value.showCloseButton)
+        repo.setShowCloseButton(true)
+        assertEquals(true, repo.settings.value.showCloseButton)
+        repo.setShowCloseButton(true)
+        assertEquals(true, repo.settings.value.showCloseButton)
+    }
+
+    @Test
     fun corruptedExclusionsJsonFallsBackToEmpty() = runTest {
         val store = FakeSettings()
         store.putString("settings.exclusions", "not-a-json")

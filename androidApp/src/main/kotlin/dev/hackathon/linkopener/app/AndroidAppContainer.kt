@@ -25,6 +25,7 @@ import dev.hackathon.linkopener.domain.usecase.SetBrowserExcludedUseCase
 import dev.hackathon.linkopener.domain.usecase.SetBrowserOrderUseCase
 import dev.hackathon.linkopener.domain.usecase.SetRulesUseCase
 import dev.hackathon.linkopener.domain.usecase.SetShowBrowserProfilesUseCase
+import dev.hackathon.linkopener.domain.usecase.SetShowCloseButtonUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateLanguageUseCase
 import dev.hackathon.linkopener.domain.usecase.UpdateThemeUseCase
 import dev.hackathon.linkopener.platform.NoOpAutoStartManager
@@ -113,6 +114,7 @@ class AndroidAppContainer(context: Context) {
     val removeManualBrowserUseCase = RemoveManualBrowserUseCase(settingsRepository)
     val setRulesUseCase = SetRulesUseCase(settingsRepository)
     val setShowBrowserProfilesUseCase = SetShowBrowserProfilesUseCase(settingsRepository)
+    val setShowCloseButtonUseCase = SetShowCloseButtonUseCase(settingsRepository)
 
     private val ruleEngine = RuleEngine(debug = false, log = ::println)
 
@@ -165,6 +167,7 @@ class AndroidAppContainer(context: Context) {
         removeManualBrowser = removeManualBrowserUseCase,
         setRules = setRulesUseCase,
         setShowBrowserProfiles = setShowBrowserProfilesUseCase,
+        setShowCloseButton = setShowCloseButtonUseCase,
         discoverBrowsers = discoverBrowsersUseCase,
         observeIsDefaultBrowser = observeIsDefaultBrowserUseCase,
         getIsDefaultBrowser = getIsDefaultBrowserUseCase,

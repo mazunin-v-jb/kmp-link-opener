@@ -20,4 +20,5 @@ interface SettingsRepository {
     suspend fun removeManualBrowser(id: BrowserId)
     suspend fun setRules(rules: List<UrlRule>)
     suspend fun setShowBrowserProfiles(enabled: Boolean)
+    suspend fun setShowCloseButton(enabled: Boolean)
 }

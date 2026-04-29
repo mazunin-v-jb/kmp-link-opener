@@ -127,6 +127,7 @@ private fun ApplicationScope.TrayHostBody(
                 icons = browserIcons,
                 onPick = container.pickerCoordinator::pickBrowser,
                 onDismiss = container.pickerCoordinator::dismiss,
+                showCloseButton = settings.showCloseButton,
             )
         }
     }

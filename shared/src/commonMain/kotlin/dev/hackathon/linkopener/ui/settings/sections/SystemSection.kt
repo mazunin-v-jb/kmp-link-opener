@@ -24,6 +24,8 @@ import kmp_link_opener.shared.generated.resources.Res
 import kmp_link_opener.shared.generated.resources.section_system
 import kmp_link_opener.shared.generated.resources.show_browser_profiles_description
 import kmp_link_opener.shared.generated.resources.show_browser_profiles_title
+import kmp_link_opener.shared.generated.resources.show_close_button_description
+import kmp_link_opener.shared.generated.resources.show_close_button_title
 import kmp_link_opener.shared.generated.resources.start_at_login
 import kmp_link_opener.shared.generated.resources.start_at_login_description
 import org.jetbrains.compose.resources.stringResource
@@ -34,6 +36,8 @@ internal fun SystemSection(
     onAutoStartChange: (Boolean) -> Unit,
     showBrowserProfiles: Boolean,
     onShowBrowserProfilesChange: (Boolean) -> Unit,
+    showCloseButton: Boolean,
+    onShowCloseButtonChange: (Boolean) -> Unit,
 ) {
     SectionPane(stringResource(Res.string.section_system), AppIcons.System) {
         SectionCard {
@@ -50,6 +54,14 @@ internal fun SystemSection(
                 description = stringResource(Res.string.show_browser_profiles_description),
                 checked = showBrowserProfiles,
                 onCheckedChange = onShowBrowserProfilesChange,
+            )
+        }
+        SectionCard {
+            ToggleRow(
+                title = stringResource(Res.string.show_close_button_title),
+                description = stringResource(Res.string.show_close_button_description),
+                checked = showCloseButton,
+                onCheckedChange = onShowCloseButtonChange,
             )
         }
     }

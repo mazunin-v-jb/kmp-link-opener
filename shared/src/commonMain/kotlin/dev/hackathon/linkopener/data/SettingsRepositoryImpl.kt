@@ -97,6 +97,12 @@ class SettingsRepositoryImpl(
         _settings.update { it.copy(showBrowserProfiles = enabled) }
     }
 
+    override suspend fun setShowCloseButton(enabled: Boolean) = writeLock.withLock {
+        if (enabled == _settings.value.showCloseButton) return@withLock
+        store.putBoolean(KEY_SHOW_CLOSE_BUTTON, enabled)
+        _settings.update { it.copy(showCloseButton = enabled) }
+    }
+
     private fun load(): AppSettings = AppSettings(
         theme = readEnum(KEY_THEME, AppTheme.entries, AppTheme.System),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
@@ -108,6 +114,7 @@ class SettingsRepositoryImpl(
         manualBrowsers = readJson(KEY_MANUAL_BROWSERS, emptyList(), BROWSER_LIST_SERIALIZER),
         rules = readJson(KEY_RULES, emptyList(), RULE_LIST_SERIALIZER),
         showBrowserProfiles = store.getBoolean(KEY_SHOW_PROFILES, true),
+        showCloseButton = store.getBoolean(KEY_SHOW_CLOSE_BUTTON, false),
     )
 
     private fun <E : Enum<E>> readEnum(key: String, values: List<E>, default: E): E {
@@ -140,6 +147,7 @@ class SettingsRepositoryImpl(
         const val KEY_MANUAL_BROWSERS = "settings.manualBrowsers"
         const val KEY_RULES = "settings.rules"
         const val KEY_SHOW_PROFILES = "settings.showBrowserProfiles"
+        const val KEY_SHOW_CLOSE_BUTTON = "settings.showCloseButton"
 
         // BrowserId is a value class around String — we persist the bare
         // string so the JSON shape is `["a","b"]`, not `[{"value":"a"},…]`.

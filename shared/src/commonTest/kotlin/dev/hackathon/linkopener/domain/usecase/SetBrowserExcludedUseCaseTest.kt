@@ -64,5 +64,6 @@ class SetBrowserExcludedUseCaseTest {
         override suspend fun removeManualBrowser(id: BrowserId) = error("not used")
         override suspend fun setRules(rules: List<dev.hackathon.linkopener.core.model.UrlRule>) = error("not used")
         override suspend fun setShowBrowserProfiles(enabled: Boolean) = error("not used")
+        override suspend fun setShowCloseButton(enabled: Boolean) = error("not used")
     }
 }

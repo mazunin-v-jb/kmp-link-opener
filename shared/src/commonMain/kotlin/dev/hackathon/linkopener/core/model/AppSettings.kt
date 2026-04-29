@@ -16,6 +16,11 @@ data class AppSettings(
     // shown as N rows. Default `true` keeps post-stage-046 behaviour intact
     // for users who already saw the per-profile rows.
     val showBrowserProfiles: Boolean = true,
+    // When true, a close (×) button is rendered in the picker popup header so
+    // users can dismiss the picker without picking a browser or pressing Escape.
+    // Defaults to false to keep the popup uncluttered for users who dismiss via
+    // Escape or click-outside.
+    val showCloseButton: Boolean = false,
 ) {
     companion object {
         val Default = AppSettings()
