@@ -41,7 +41,7 @@ class WindowsAutoStartManagerTest {
         val recorder = RecordingRunner()
         val manager = WindowsAutoStartManager(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\Program Files\\Link Opener\\Link Opener.exe" },
+            launchTokensProvider = { listOf("C:\\Program Files\\Link Opener\\Link Opener.exe") },
         )
 
         manager.setEnabled(true)
@@ -64,7 +64,7 @@ class WindowsAutoStartManagerTest {
         val recorder = RecordingRunner()
         val manager = WindowsAutoStartManager(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\unused.exe" },
+            launchTokensProvider = { listOf("C:\\unused.exe") },
         )
 
         manager.setEnabled(false)
@@ -81,12 +81,40 @@ class WindowsAutoStartManagerTest {
     }
 
     @Test
+    fun setEnabledTrueWritesJavaJarLineForFatJarLaunch() = runTest {
+        // Cross-platform fat-JAR distribution: ProcessHandle reports
+        // java.exe + ["-jar", "<jar>"] argv. The Run-key value must be
+        // the full `"<java>" -jar "<jar>"` so Windows can re-launch on
+        // login — just `"<java>"` would start a Java REPL instead.
+        val recorder = RecordingRunner()
+        val manager = WindowsAutoStartManager(
+            registry = RegistryReader(runner = recorder),
+            launchTokensProvider = {
+                listOf(
+                    "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
+                    "-jar",
+                    "C:\\Users\\u\\link-opener-1.0.7-windows-x64.jar",
+                )
+            },
+        )
+
+        manager.setEnabled(true)
+
+        val data = recorder.calls.last()[recorder.calls.last().indexOf("/d") + 1]
+        assertEquals(
+            "\"C:\\Program Files\\Java\\jdk-21\\bin\\java.exe\" -jar " +
+                "\"C:\\Users\\u\\link-opener-1.0.7-windows-x64.jar\"",
+            data,
+        )
+    }
+
+    @Test
     fun setEnabledIsIdempotent() = runTest {
         // Calling enable twice is safe — `reg add` overwrites with /f.
         val recorder = RecordingRunner()
         val manager = WindowsAutoStartManager(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\app.exe" },
+            launchTokensProvider = { listOf("C:\\app.exe") },
         )
 
         manager.setEnabled(true)
@@ -104,7 +132,7 @@ class WindowsAutoStartManagerTest {
         val recorder = RecordingRunner()
         val manager = WindowsAutoStartManager(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { null }, // ProcessHandle didn't return a path
+            launchTokensProvider = { null }, // ProcessHandle didn't return a path
         )
 
         manager.setEnabled(true)

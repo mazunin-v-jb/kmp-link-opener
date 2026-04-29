@@ -27,17 +27,18 @@ import dev.hackathon.linkopener.platform.AutoStartManager
  */
 class WindowsAutoStartManager(
     private val registry: RegistryReader = RegistryReader(),
-    private val exePathProvider: () -> String? = { ProcessHandle.current().info().command().orElse(null) },
+    private val launchTokensProvider: () -> List<String>? = WindowsLaunchCommand::current,
 ) : AutoStartManager {
 
     override suspend fun isEnabled(): Boolean = registry.queryValue(RUN_KEY, VALUE_NAME) != null
 
     override suspend fun setEnabled(enabled: Boolean) {
         if (enabled) {
-            val exePath = exePathProvider() ?: return
-            // Quote the path so spaces (e.g. "C:\Program Files\…") don't
-            // get interpreted as separate argv tokens by the OS launcher.
-            registry.setValue(RUN_KEY, VALUE_NAME, "\"$exePath\"")
+            val tokens = launchTokensProvider() ?: return
+            // [WindowsLaunchCommand.quote] handles both packaged `<exe>`
+            // and fat-JAR `<java> -jar <jar>` shapes — see that class
+            // for why this matters.
+            registry.setValue(RUN_KEY, VALUE_NAME, WindowsLaunchCommand.quote(tokens))
         } else {
             registry.deleteValue(RUN_KEY, VALUE_NAME)
         }

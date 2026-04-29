@@ -38,28 +38,36 @@ import dev.hackathon.linkopener.platform.windows.WindowsDefaultBrowserService.Co
  */
 class WindowsHandlerRegistration(
     private val registry: RegistryReader = RegistryReader(),
-    private val exePathProvider: () -> String? = { ProcessHandle.current().info().command().orElse(null) },
+    private val launchTokensProvider: () -> List<String>? = WindowsLaunchCommand::current,
 ) {
 
     /**
-     * Returns true if all three registry locations were written
-     * successfully, false on the first failure (other writes are still
-     * attempted; partial registration is left in place since Windows
-     * tolerates it). Call from `main()` on Windows hosts only.
+     * Returns true if all registry locations were written successfully,
+     * false on the first failure (other writes are still attempted;
+     * partial registration is left in place since Windows tolerates
+     * it). Call from `main()` on Windows hosts only.
+     *
+     * The exec lines written to `shell\open\command` distinguish two
+     * launch shapes (see [WindowsLaunchCommand]): packaged jpackage
+     * `<exe>` vs cross-platform fat-JAR `<java> -jar <jar>`. Without
+     * that distinction, the URL handler under fat-JAR distribution
+     * would write `"<java>" "%1"`, which fails because `java.exe`
+     * doesn't accept a URL as its first argument.
      */
     suspend fun register(): Boolean {
-        val exePath = exePathProvider() ?: return false
-        val quotedExe = "\"$exePath\""
+        val launchTokens = launchTokensProvider() ?: return false
+        val quotedLaunch = WindowsLaunchCommand.quote(launchTokens)
+        // URL handler exec line: launch tokens followed by "%1" so
+        // Windows substitutes the URL.
+        val execWithUrl = "$quotedLaunch \"%1\""
 
-        // 1. The ProgId itself. Display name + shell\open\command "<exe>" "%1"
+        // 1. The ProgId itself. Display name + shell\open\command line.
         val progIdRoot = "HKCU\\SOFTWARE\\Classes\\$OWN_PROG_ID"
         val a1 = registry.setValue(progIdRoot, "(Default)", "Link Opener URL Handler")
-        // shell\open\command's (Default) is the exec line: <exe> "%1" — Windows
-        // substitutes %1 with the URL when invoking us as a handler.
         val a2 = registry.setValue(
             "$progIdRoot\\shell\\open\\command",
             "(Default)",
-            "$quotedExe \"%1\"",
+            execWithUrl,
         )
 
         // 2. Capabilities — the StartMenuInternet sub-tree advertising
@@ -77,12 +85,13 @@ class WindowsHandlerRegistration(
             "(Default)",
             "Link Opener",
         )
-        // shell\open\command at the top of the StartMenuInternet entry — same
-        // exec line, lets Windows launch us from "Default apps" entries.
+        // shell\open\command at the top of the StartMenuInternet entry —
+        // same launch tokens, no "%1" (this is the "open without URL"
+        // entry-point used by the Default Apps picker).
         val b6 = registry.setValue(
             "HKCU\\SOFTWARE\\Clients\\StartMenuInternet\\$REGISTRATION_NAME\\shell\\open\\command",
             "(Default)",
-            quotedExe,
+            quotedLaunch,
         )
 
         // 3. Registered Applications — the atom that says "look at

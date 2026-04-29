@@ -13,7 +13,7 @@ class WindowsHandlerRegistrationTest {
         val recorder = RecordingRunner()
         val reg = WindowsHandlerRegistration(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\Program Files\\Link Opener\\Link Opener.exe" },
+            launchTokensProvider = { listOf("C:\\Program Files\\Link Opener\\Link Opener.exe") },
         )
 
         val ok = reg.register()
@@ -32,7 +32,7 @@ class WindowsHandlerRegistrationTest {
         val recorder = RecordingRunner()
         val reg = WindowsHandlerRegistration(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\App\\LinkOpener.exe" },
+            launchTokensProvider = { listOf("C:\\App\\LinkOpener.exe") },
         )
 
         reg.register()
@@ -53,7 +53,7 @@ class WindowsHandlerRegistrationTest {
         val recorder = RecordingRunner()
         val reg = WindowsHandlerRegistration(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\X.exe" },
+            launchTokensProvider = { listOf("C:\\X.exe") },
         )
 
         reg.register()
@@ -74,7 +74,7 @@ class WindowsHandlerRegistrationTest {
         val recorder = RecordingRunner()
         val reg = WindowsHandlerRegistration(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\X.exe" },
+            launchTokensProvider = { listOf("C:\\X.exe") },
         )
 
         reg.register()
@@ -93,11 +93,44 @@ class WindowsHandlerRegistrationTest {
     }
 
     @Test
+    fun registerWritesJavaJarLineForFatJarLaunch() = runTest {
+        // Cross-platform fat-JAR distribution: Process info reports
+        // java.exe + ["-jar", "<jar>"]. The shell\open\command line
+        // must be `"<java>" -jar "<jar>" "%1"` — without -jar and the
+        // jar path, Windows would invoke `java.exe URL` which fails
+        // because java.exe doesn't accept a URL argument.
+        val recorder = RecordingRunner()
+        val reg = WindowsHandlerRegistration(
+            registry = RegistryReader(runner = recorder),
+            launchTokensProvider = {
+                listOf(
+                    "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
+                    "-jar",
+                    "C:\\Users\\u\\link-opener-1.0.7-windows-x64.jar",
+                )
+            },
+        )
+
+        reg.register()
+
+        // ProgId shell\open\command — three tokens before "%1".
+        val progIdShellOpen = recorder.calls.firstOrNull {
+            it[1] == "add" &&
+                it.contains("HKCU\\SOFTWARE\\Classes\\LinkOpener.URL\\shell\\open\\command")
+        }
+        assertEquals(
+            "\"C:\\Program Files\\Java\\jdk-21\\bin\\java.exe\" -jar " +
+                "\"C:\\Users\\u\\link-opener-1.0.7-windows-x64.jar\" \"%1\"",
+            progIdShellOpen?.let { it[it.indexOf("/d") + 1] },
+        )
+    }
+
+    @Test
     fun registerReturnsFalseWhenExePathUnknown() = runTest {
         val recorder = RecordingRunner()
         val reg = WindowsHandlerRegistration(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { null }, // ProcessHandle didn't yield a path
+            launchTokensProvider = { null }, // ProcessHandle didn't yield a command
         )
 
         assertFalse(reg.register())
@@ -111,7 +144,7 @@ class WindowsHandlerRegistrationTest {
         val recorder = RecordingRunner(failAfter = 3)
         val reg = WindowsHandlerRegistration(
             registry = RegistryReader(runner = recorder),
-            exePathProvider = { "C:\\X.exe" },
+            launchTokensProvider = { listOf("C:\\X.exe") },
         )
 
         assertFalse(reg.register())
