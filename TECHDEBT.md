@@ -73,18 +73,6 @@ The user-visible impact is "refresh button doesn't always reflect what System Se
 
 ---
 
-## TD-10 — Linux tray icon is a monochrome silhouette, not the brand colour
-
-**Where:** `desktopApp/src/jvmMain/kotlin/dev/hackathon/linkopener/app/tray/LinuxNativeTray.kt` — `Icon(... tint = if (isMenuBarInDarkMode()) Color.White else Color.Black)`.
-
-**What:** Cinnamon / GNOME / KDE panel applets pull StatusNotifierItem icons through a path that flattens any pixmap to a single colour driven by panel theme — passing the multi-colour brand logo as-is renders as an invisible black blob on Cinnamon's dark panel. We tint the rasterised logo white-on-dark / black-on-light to keep the icon legible. Trade-off: loses the brand colour and the silhouette can read as "generic app icon" against a busy panel.
-
-**Why it's still in the repo:** the convention every Linux desktop user is familiar with (Slack / Discord / Signal / VS Code all do the same thing). Reasonable default until someone proves a workaround.
-
-**Action:** investigate whether libayatana-appindicator can be coerced into honouring full-colour pixmaps (some applets have a "full colour icons" toggle; XApp Status Applet on Mint may render the original PNG if we expose it via `IconPath` instead of `IconPixmap`). If yes, plumb a `themed icon-name` path through ComposeNativeTray's `iconContent` slot. If no, accept the silhouette and add a high-contrast monochrome variant of the logo so the tinted result is visually balanced rather than just "the colour logo with its colour stripped".
-
----
-
 ## TD-11 — `DiagnosticLog` has no automated tests
 
 **Where:** `desktopApp/src/jvmMain/kotlin/dev/hackathon/linkopener/app/DiagnosticLog.kt`.
