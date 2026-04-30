@@ -93,7 +93,3 @@ Tracked centrally in [`TECHDEBT.md`](TECHDEBT.md). Each entry has a stable ident
 - **Always bump `linkopener.version`** before pushing to `main`. Same rule on conflict resolution: pick the higher of both sides and add `+0.0.1`.
 - For each new stage, drop a `ai_stages/<NN>_<name>/plan.md` describing the implementation in detail before writing code.
 - Sensitive material (signing identity, app-specific passwords, notarization keychain profiles) lives in `~/.gradle/gradle.properties`, never in the repo.
-
-## License
-
-Hackathon project — intentionally no formal license declared. Treat as "all rights reserved" until that changes.
