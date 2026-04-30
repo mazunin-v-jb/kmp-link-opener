@@ -2,11 +2,17 @@ package dev.hackathon.linkopener.platform
 
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.toBrowserId
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.test.runTest
 
 class JvmRunningBrowserProbeTest {
+
+    @get:Rule
+    val tmp = TemporaryFolder()
 
     private val safari = Browser("com.apple.Safari", "Safari", "/Applications/Safari.app", "17.4")
     private val chrome = Browser("com.google.Chrome", "Chrome", "/Applications/Google Chrome.app", "124")
@@ -139,15 +145,123 @@ class JvmRunningBrowserProbeTest {
     }
 
     @Test
-    fun androidHostShortCircuitsToEmpty() = runTest {
+    fun androidHostReturnsNullToSignalUnsupported() = runTest {
         val probe = JvmRunningBrowserProbe(
             hostOs = HostOs.Android,
             runCommand = { error("runCommand must not be invoked on Android host") },
         )
 
-        val running = probe.runningOf(listOf(safari))
+        // null = "host doesn't support probing" — picker treats as no info
+        // (every row fully opaque) instead of "all stopped" (every row faded).
+        assertEquals(null, probe.runningOf(listOf(safari)))
+    }
 
-        assertEquals(emptySet(), running)
+    @Test
+    fun linuxMatchesWhenProcessArgvBasenameMatchesDesktopExecBasename() = runTest {
+        // Linux .desktop file says `Exec=firefox %u`. The actual running
+        // process exec'd from `/usr/lib/firefox/firefox-bin` but the
+        // wrapper sets argv[0] back to `firefox`. Basename match wins.
+        val desktop = tmp.newFile("firefox.desktop")
+        desktop.writeText(
+            """
+            [Desktop Entry]
+            Type=Application
+            Name=Firefox
+            Exec=firefox %u
+            MimeType=x-scheme-handler/http;
+            """.trimIndent(),
+        )
+        val firefox = Browser(
+            bundleId = "firefox",
+            displayName = "Firefox",
+            applicationPath = desktop.absolutePath,
+            version = null,
+        )
+        val probe = JvmRunningBrowserProbe(
+            hostOs = HostOs.Linux,
+            runCommand = { error("ps must not be invoked on Linux host") },
+            procCmdlines = { listOf("firefox", "/usr/bin/zsh", "/usr/lib/systemd/systemd") },
+            pathLookup = { name -> if (name == "firefox") "/usr/bin/firefox" else null },
+        )
+        assertEquals(setOf(firefox.toBrowserId()), probe.runningOf(listOf(firefox)))
+    }
+
+    @Test
+    fun linuxMatchesWhenProcessExePathMatchesAbsoluteExec() = runTest {
+        // .desktop with absolute path → snap binary running with the same
+        // absolute path. Exact-match path wins.
+        val desktop = tmp.newFile("chromium.desktop")
+        desktop.writeText(
+            """
+            [Desktop Entry]
+            Type=Application
+            Name=Chromium
+            Exec=/snap/chromium/current/usr/lib/chromium-browser/chromium-browser %U
+            MimeType=x-scheme-handler/http;
+            """.trimIndent(),
+        )
+        val chromium = Browser(
+            bundleId = "chromium",
+            displayName = "Chromium",
+            applicationPath = desktop.absolutePath,
+            version = null,
+        )
+        val probe = JvmRunningBrowserProbe(
+            hostOs = HostOs.Linux,
+            runCommand = { error("ps must not be invoked") },
+            procCmdlines = {
+                listOf(
+                    "/usr/bin/zsh",
+                    "/snap/chromium/current/usr/lib/chromium-browser/chromium-browser",
+                )
+            },
+            pathLookup = { error("PATH lookup not needed for absolute Exec") },
+        )
+        assertEquals(setOf(chromium.toBrowserId()), probe.runningOf(listOf(chromium)))
+    }
+
+    @Test
+    fun linuxReturnsEmptyWhenBrowserNotRunning() = runTest {
+        val desktop = tmp.newFile("firefox.desktop")
+        desktop.writeText(
+            """
+            [Desktop Entry]
+            Type=Application
+            Name=Firefox
+            Exec=firefox %u
+            MimeType=x-scheme-handler/http;
+            """.trimIndent(),
+        )
+        val firefox = Browser(
+            bundleId = "firefox",
+            displayName = "Firefox",
+            applicationPath = desktop.absolutePath,
+            version = null,
+        )
+        val probe = JvmRunningBrowserProbe(
+            hostOs = HostOs.Linux,
+            runCommand = { error("ps must not be invoked") },
+            procCmdlines = { listOf("/usr/bin/zsh", "/lib/systemd/systemd") },
+            pathLookup = { name -> if (name == "firefox") "/usr/bin/firefox" else null },
+        )
+        assertEquals(emptySet(), probe.runningOf(listOf(firefox)))
+    }
+
+    @Test
+    fun linuxReturnsEmptyWhenDesktopFileMissing() = runTest {
+        val ghost = Browser(
+            bundleId = "ghost",
+            displayName = "Ghost",
+            applicationPath = "/nonexistent/ghost.desktop",
+            version = null,
+        )
+        val probe = JvmRunningBrowserProbe(
+            hostOs = HostOs.Linux,
+            runCommand = { error("ps must not be invoked") },
+            procCmdlines = { listOf("ghost") },
+            pathLookup = { error("not invoked") },
+        )
+        assertEquals(emptySet(), probe.runningOf(listOf(ghost)))
     }
 
     @Test

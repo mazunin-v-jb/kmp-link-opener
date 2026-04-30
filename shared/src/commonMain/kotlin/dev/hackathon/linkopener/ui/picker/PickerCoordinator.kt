@@ -1,6 +1,7 @@
 package dev.hackathon.linkopener.ui.picker
 
 import dev.hackathon.linkopener.core.model.Browser
+import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.coroutines.runCatchingNonCancellation
 import dev.hackathon.linkopener.data.BrowserIconRepository
@@ -72,13 +73,15 @@ class PickerCoordinator(
                     launcher.openIn(ordered.single(), url)
                     return@runCatchingNonCancellation
                 }
-                // Probe is best-effort — a hang or non-zero exit from the
-                // underlying `ps`/PowerShell call surfaces as an empty set,
-                // which the UI treats as "no info, render fully opaque".
-                // Don't let it tank the picker.
-                val runningIds = runCatchingNonCancellation {
+                // Probe is best-effort. Failures (hang, non-zero exit) and
+                // genuinely-unsupported hosts (Android) collapse to `null`,
+                // which the picker treats as "no info, render fully opaque".
+                // A successful probe that matched nothing returns an empty
+                // set, which the picker treats as "everyone stopped, fade
+                // every row".
+                val runningIds: Set<BrowserId>? = runCatchingNonCancellation {
                     runningBrowserProbe.runningOf(ordered)
-                }.getOrElse { emptySet() }
+                }.getOrNull()
                 // Idempotent — repo skips paths that have already been
                 // attempted, so the cost is a no-op once warmed up by
                 // AppContainer's startup discovery dump.

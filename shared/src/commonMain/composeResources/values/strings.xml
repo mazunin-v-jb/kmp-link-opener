@@ -103,6 +103,7 @@
     <string name="picker_show_all">Show all</string>
     <string name="picker_empty">No browsers available</string>
     <string name="picker_empty_hint">Open Settings to manage exclusions or install a browser.</string>
+    <string name="picker_browser_not_running">not running</string>
 
     <!-- Single-instance nudge -->
     <string name="nudge_already_running">Already here. I heard you the first time.</string>

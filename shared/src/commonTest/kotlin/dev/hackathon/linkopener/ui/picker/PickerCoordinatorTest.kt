@@ -266,10 +266,12 @@ class PickerCoordinatorTest {
     }
 
     @Test
-    fun probeFailureFallsBackToEmptyRunningSetWithoutKillingPicker() = runTest {
+    fun probeFailureFallsBackToNullRunningSetWithoutKillingPicker() = runTest {
         // The probe is best-effort UX polish; an exception inside it must
-        // not prevent the popup from rendering. Empty set lets the UI
-        // gracefully degrade to "all rows fully opaque".
+        // not prevent the popup from rendering. `null` lets the UI
+        // gracefully degrade to "all rows fully opaque" (no info), which
+        // is distinct from an empty-set probe success (every row faded
+        // because nothing is running).
         val probe = ThrowingRunningBrowserProbe()
         val coord = newCoordinator(
             scope = this,
@@ -282,7 +284,7 @@ class PickerCoordinatorTest {
 
         val state = coord.state.value
         assertIs<PickerState.Showing>(state)
-        assertEquals(emptySet(), state.runningBrowserIds)
+        assertEquals(null, state.runningBrowserIds)
     }
 
     @Test

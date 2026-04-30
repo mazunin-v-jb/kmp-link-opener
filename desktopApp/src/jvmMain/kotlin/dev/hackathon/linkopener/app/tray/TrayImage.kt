@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import dev.hackathon.linkopener.platform.HostOs
+import java.awt.SystemTray
 import java.awt.image.BufferedImage
 import java.awt.image.MultiResolutionImage
 
@@ -68,7 +69,18 @@ internal fun prepareTrayImage(
 
 private fun trayPixelSize(hostOs: HostOs): Int = when (hostOs) {
     HostOs.MacOs -> MAC_OS_TRAY_PIXEL_SIZE
-    HostOs.Linux -> LINUX_TRAY_PIXEL_SIZE
+    // On Linux, the panel applet (Cinnamon's "Notification Area",
+    // GNOME's status applet, …) tells AWT what size it wants the icon
+    // at via the XEmbed protocol. Honoring that exactly is the only way
+    // to get a clean render on systems whose AWT bilinear-downscale
+    // collapses fine line art when we hand it a 44px icon for a 22px
+    // slot. Falls back to LINUX_TRAY_PIXEL_SIZE if the system tray
+    // isn't queryable (the tray host eventually warns and skips the
+    // icon entirely if isSupported returns false, so this branch is
+    // mostly defensive).
+    HostOs.Linux -> runCatching {
+        if (SystemTray.isSupported()) SystemTray.getSystemTray().trayIconSize.width else null
+    }.getOrNull()?.takeIf { it > 0 } ?: LINUX_TRAY_PIXEL_SIZE
     HostOs.Windows -> WINDOWS_TRAY_PIXEL_SIZE
     // Android branch is unreachable here (the desktop tray code never runs
     // on Android), but Kotlin requires exhaustive `when` over enums.

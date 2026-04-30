@@ -2,6 +2,7 @@ package dev.hackathon.linkopener.app.tray
 
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -21,6 +22,7 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.ui.picker.BrowserPickerScreen
+import dev.hackathon.linkopener.ui.strings.LocalAppLocale
 import java.awt.MouseInfo
 import kotlinx.coroutines.flow.drop
 
@@ -30,7 +32,13 @@ fun ApplicationScope.PickerWindow(
     url: String,
     browsers: List<Browser>,
     icons: Map<String, ImageBitmap>,
-    runningBrowserIds: Set<BrowserId>,
+    runningBrowserIds: Set<BrowserId>?,
+    // Nonce that flips on language switch — propagated through
+    // [LocalAppLocale] so any string-using composable inside the
+    // picker recomposes when the user picks a different language. The
+    // Window block opens its own Compose subcomposition, so the
+    // CompositionLocalProvider must live INSIDE it (not in TrayHost).
+    localeNonce: String,
     onPick: (Browser) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -73,24 +81,26 @@ fun ApplicationScope.PickerWindow(
                     if (!focused) onDismiss()
                 }
         }
-        BrowserPickerScreen(
-            url = url,
-            browsers = browsers,
-            onPick = onPick,
-            // "Show all" grows the popup downward so the previously hidden
-            // browsers fit alongside the original three, with the whole list
-            // scrollable inside.
-            onExpand = {
-                windowState.size = DpSize(PICKER_WIDTH, PICKER_HEIGHT_EXPANDED)
-            },
-            icons = icons,
-            runningBrowserIds = runningBrowserIds,
-            // Header doubles as a drag handle so users can reposition the
-            // popup without a title bar (we run undecorated). WindowDraggableArea
-            // is a WindowScope extension, so resolution depends on this lambda
-            // being defined inside the Window {} block — which it is.
-            headerWrapper = { content -> WindowDraggableArea { content() } },
-        )
+        CompositionLocalProvider(LocalAppLocale provides localeNonce) {
+            BrowserPickerScreen(
+                url = url,
+                browsers = browsers,
+                onPick = onPick,
+                // "Show all" grows the popup downward so the previously hidden
+                // browsers fit alongside the original three, with the whole list
+                // scrollable inside.
+                onExpand = {
+                    windowState.size = DpSize(PICKER_WIDTH, PICKER_HEIGHT_EXPANDED)
+                },
+                icons = icons,
+                runningBrowserIds = runningBrowserIds,
+                // Header doubles as a drag handle so users can reposition the
+                // popup without a title bar (we run undecorated). WindowDraggableArea
+                // is a WindowScope extension, so resolution depends on this lambda
+                // being defined inside the Window {} block — which it is.
+                headerWrapper = { content -> WindowDraggableArea { content() } },
+            )
+        }
     }
 }
 

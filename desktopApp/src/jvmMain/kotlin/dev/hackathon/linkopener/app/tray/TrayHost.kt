@@ -126,6 +126,10 @@ private fun ApplicationScope.TrayHostBody(
                 browsers = currentPickerState.browsers,
                 icons = browserIcons,
                 runningBrowserIds = currentPickerState.runningBrowserIds,
+                // Drives LocalAppLocale inside the picker subcomposition so
+                // string-using composables there recompose on language
+                // switch the same way SettingsScreen does.
+                localeNonce = settings.language.name,
                 onPick = container.pickerCoordinator::pickBrowser,
                 onDismiss = container.pickerCoordinator::dismiss,
             )

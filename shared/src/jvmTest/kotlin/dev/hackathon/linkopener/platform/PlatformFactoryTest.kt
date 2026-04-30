@@ -1,5 +1,9 @@
 package dev.hackathon.linkopener.platform
 
+import dev.hackathon.linkopener.platform.linux.LinuxAutoStartManager
+import dev.hackathon.linkopener.platform.linux.LinuxBrowserDiscovery
+import dev.hackathon.linkopener.platform.linux.LinuxDefaultBrowserService
+import dev.hackathon.linkopener.platform.linux.LinuxLinkLauncher
 import dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserDiscovery
 import dev.hackathon.linkopener.platform.macos.MacOsDefaultBrowserService
@@ -107,5 +111,37 @@ class PlatformFactoryTest {
     fun currentOsReflectsHost() {
         val expected = PlatformFactory.detectHostOs(System.getProperty("os.name").orEmpty())
         assertEquals(expected, PlatformFactory.currentOs)
+    }
+
+    // --- factory smoke tests on Linux. Disabled on non-Linux hosts.
+
+    private val onLinux: Boolean
+        get() = System.getProperty("os.name").orEmpty().lowercase().let {
+            "nux" in it || "nix" in it || "aix" in it
+        }
+
+    @Test
+    fun createBrowserDiscoveryReturnsLinuxImplOnLinuxHost() {
+        assumeTrue("requires Linux host", onLinux)
+        assertTrue(PlatformFactory.createBrowserDiscovery() is LinuxBrowserDiscovery)
+    }
+
+    @Test
+    fun createAutoStartManagerReturnsLinuxImplOnLinuxHost() {
+        assumeTrue("requires Linux host", onLinux)
+        assertTrue(PlatformFactory.createAutoStartManager() is LinuxAutoStartManager)
+    }
+
+    @Test
+    fun createDefaultBrowserServiceReturnsLinuxImplOnLinuxHost() {
+        assumeTrue("requires Linux host", onLinux)
+        val service = PlatformFactory.createDefaultBrowserService(ownBundleId = "irrelevant")
+        assertTrue(service is LinuxDefaultBrowserService)
+    }
+
+    @Test
+    fun createLinkLauncherReturnsLinuxImplOnLinuxHost() {
+        assumeTrue("requires Linux host", onLinux)
+        assertTrue(PlatformFactory.createLinkLauncher() is LinuxLinkLauncher)
     }
 }

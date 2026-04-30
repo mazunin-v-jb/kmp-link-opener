@@ -38,6 +38,7 @@ import dev.hackathon.linkopener.platform.LinkLauncher
 import dev.hackathon.linkopener.platform.PlatformFactory
 import dev.hackathon.linkopener.platform.RunningBrowserProbe
 import dev.hackathon.linkopener.platform.UrlReceiver
+import dev.hackathon.linkopener.platform.linux.LinuxHandlerRegistration
 import dev.hackathon.linkopener.platform.windows.WindowsBrowserDiscovery
 import dev.hackathon.linkopener.ui.picker.PickerCoordinator
 import dev.hackathon.linkopener.ui.settings.SettingsViewModel
@@ -71,6 +72,7 @@ class AppContainer {
     // sets as bundleId, so the macOS reverse-DNS id never matches there.
     private val selfBundleIdForDiscovery: String = when (currentOs) {
         HostOs.Windows -> WindowsBrowserDiscovery.OWN_START_MENU_KEY
+        HostOs.Linux -> LinuxHandlerRegistration.OWN_DESKTOP_ID
         else -> ownBundleId
     }
 
@@ -171,6 +173,20 @@ class AppContainer {
         // different choice.
         applyJvmLocale(settingsRepository.settings.value.language)
 
+        // Always-on diagnostic — small, useful for any "wrong language /
+        // locale" report. DiagnosticLog tees this into ~/.linkopener/last-run.log
+        // so it survives a double-click launch with no terminal attached.
+        run {
+            val l = java.util.Locale.getDefault()
+            println(
+                "[startup] os=$currentOs systemLanguageTag='$systemLanguageTag' " +
+                    "appLanguage=${settingsRepository.settings.value.language} " +
+                    "Locale.getDefault=${l.toLanguageTag()} ($l) " +
+                    "java=${System.getProperty("java.runtime.version")} " +
+                    "xdg=${System.getenv("XDG_CURRENT_DESKTOP").orEmpty()}",
+            )
+        }
+
         // Warm-up discovery on startup so the picker shows instantly when the
         // first URL arrives instead of paying the 1-3s plutil latency. The
         // result is cached inside BrowserRepositoryImpl, so subsequent
@@ -187,15 +203,13 @@ class AppContainer {
                         scope = coroutineScope,
                         applicationPaths = browsers.map { it.applicationPath },
                     )
-                    if (DebugFlags.enabled) {
-                        println("Discovered ${browsers.size} browser(s):")
-                        browsers.forEach { browser ->
-                            val version = browser.version ?: "(no version)"
-                            println(
-                                "  - ${browser.displayName} $version " +
-                                    "(${browser.bundleId}) at ${browser.applicationPath}",
-                            )
-                        }
+                    println("[discovery] discovered ${browsers.size} browser(s):")
+                    browsers.forEach { browser ->
+                        val version = browser.version ?: "(no version)"
+                        println(
+                            "[discovery]   - ${browser.displayName} $version " +
+                                "(${browser.bundleId}) at ${browser.applicationPath}",
+                        )
                     }
                 }
                 .onFailure {

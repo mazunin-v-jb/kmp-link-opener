@@ -46,6 +46,21 @@ internal fun ApplicationScope.NativeTray(
         return
     }
 
+    // Linux tray-icon visibility is famously brittle (XEmbed timing, applet
+    // version mismatch, GTK2/3 fallbacks, …). Print what AWT actually sees
+    // so a "no icon" report comes with enough diagnostic context to tell
+    // whether we hit the JDK-side support gate or a pure render bug.
+    if (hostOs == HostOs.Linux) {
+        DisposableEffect(Unit) {
+            val tray = SystemTray.getSystemTray()
+            System.err.println(
+                "[tray] Linux SystemTray.isSupported=true, " +
+                    "trayIconSize=${tray.trayIconSize.width}x${tray.trayIconSize.height}",
+            )
+            onDispose {}
+        }
+    }
+
     val image = remember(iconPainter, hostOs) { prepareTrayImage(iconPainter, hostOs) }
 
     val currentOnLeftClick by rememberUpdatedState(onLeftClick)

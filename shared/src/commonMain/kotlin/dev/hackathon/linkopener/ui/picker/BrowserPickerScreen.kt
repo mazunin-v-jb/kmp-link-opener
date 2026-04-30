@@ -40,10 +40,12 @@ import dev.hackathon.linkopener.core.model.Browser
 import dev.hackathon.linkopener.core.model.BrowserId
 import dev.hackathon.linkopener.core.model.toBrowserId
 import dev.hackathon.linkopener.core.model.uiLabel
+import dev.hackathon.linkopener.ui.strings.useLocaleNonce
 import dev.hackathon.linkopener.ui.theme.BrowserAvatar
 import dev.hackathon.linkopener.ui.theme.surfaceContainerLow
 import dev.hackathon.linkopener.ui.util.PlatformTooltip
 import kmp_link_opener.shared.generated.resources.Res
+import kmp_link_opener.shared.generated.resources.picker_browser_not_running
 import kmp_link_opener.shared.generated.resources.picker_empty
 import kmp_link_opener.shared.generated.resources.picker_empty_hint
 import kmp_link_opener.shared.generated.resources.picker_header_open
@@ -71,16 +73,28 @@ fun BrowserPickerScreen(
     // letter avatar, matching the look before "browser-icons" landed.
     icons: Map<String, ImageBitmap> = emptyMap(),
     // Subset of [browsers] whose process is currently running; non-members
-    // get rendered with reduced alpha so the running set is obvious at a
-    // glance. Empty set → "no info" mode (e.g. on Android, where probing
-    // isn't supported), all rows stay at full opacity.
-    runningBrowserIds: Set<BrowserId> = emptySet(),
+    // get rendered with reduced alpha. Three-state value, see PickerState
+    // KDoc — `null` means "no probe info available" and keeps every row
+    // opaque (Android, probe failure). Empty set means "probe ran, nothing
+    // running" and fades every row.
+    runningBrowserIds: Set<BrowserId>? = null,
     headerWrapper: @Composable (content: @Composable () -> Unit) -> Unit = { it() },
 ) {
+    // Subscribe the picker subtree to the language nonce so a language
+    // switch invalidates everything below — without this, Compose smart-
+    // skips composables whose only string-typed inputs are stringResource
+    // lookups, leaving the popup stuck on the previous language until
+    // some other input changes (e.g. the user re-clicks). Same trick the
+    // Settings tree uses (TopAppBar / Sidebar / NotDefaultBanner all read
+    // useLocaleNonce()).
+    useLocaleNonce()
+
     var expanded by remember(browsers) { mutableStateOf(false) }
-    // "no info" → don't fade anything, otherwise we'd ash-out the entire
-    // list when the host doesn't expose process state.
-    val noRunningInfo = runningBrowserIds.isEmpty()
+    // null = host couldn't tell us (Android / probe failure) — leave every
+    // row at full opacity. Empty set is meaningful: probe ran, nothing's
+    // running, fade everyone.
+    val noRunningInfo = runningBrowserIds == null
+    val effectiveRunningIds = runningBrowserIds.orEmpty()
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -104,7 +118,7 @@ fun BrowserPickerScreen(
                 ScrollableBrowserList(
                     browsers = browsers,
                     icons = icons,
-                    runningBrowserIds = runningBrowserIds,
+                    runningBrowserIds = effectiveRunningIds,
                     noRunningInfo = noRunningInfo,
                     onPick = onPick,
                 )
@@ -113,7 +127,7 @@ fun BrowserPickerScreen(
                     BrowserRow(
                         browser = browser,
                         icon = icons[browser.applicationPath],
-                        isRunning = noRunningInfo || browser.toBrowserId() in runningBrowserIds,
+                        isRunning = noRunningInfo || browser.toBrowserId() in effectiveRunningIds,
                         onClick = { onPick(browser) },
                     )
                 }
@@ -216,6 +230,7 @@ private fun BrowserRow(
     // Modifier.alpha is graphics-layer only, so the click target stays the
     // full row regardless of opacity.
     val rowAlpha = if (isRunning) 1f else 0.45f
+    val notRunningLabel = stringResource(Res.string.picker_browser_not_running)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -243,6 +258,16 @@ private fun BrowserRow(
                 Text(
                     text = browser.version,
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+            if (!isRunning) {
+                Text(
+                    text = notRunningLabel,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 11.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    ),
                     color = MaterialTheme.colorScheme.outline,
                 )
             }

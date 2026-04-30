@@ -1,8 +1,12 @@
 package dev.hackathon.linkopener.platform
 
 import dev.hackathon.linkopener.domain.BrowserMetadataExtractor
+import dev.hackathon.linkopener.platform.linux.LinuxAutoStartManager
+import dev.hackathon.linkopener.platform.linux.LinuxBrowserDiscovery
 import dev.hackathon.linkopener.platform.linux.LinuxBrowserIconLoader
+import dev.hackathon.linkopener.platform.linux.LinuxBrowserMetadataExtractor
 import dev.hackathon.linkopener.platform.linux.LinuxDefaultBrowserService
+import dev.hackathon.linkopener.platform.linux.LinuxLinkLauncher
 import dev.hackathon.linkopener.platform.macos.MacOsAutoStartManager
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserDiscovery
 import dev.hackathon.linkopener.platform.macos.MacOsBrowserIconLoader
@@ -22,7 +26,7 @@ object PlatformFactory {
     fun createAutoStartManager(): AutoStartManager = when (currentOs) {
         HostOs.MacOs -> MacOsAutoStartManager()
         HostOs.Windows -> WindowsAutoStartManager()
-        HostOs.Linux,
+        HostOs.Linux -> LinuxAutoStartManager()
         HostOs.Android,
         HostOs.Other -> NoOpAutoStartManager()
     }
@@ -30,7 +34,7 @@ object PlatformFactory {
     fun createBrowserDiscovery(): BrowserDiscovery = when (currentOs) {
         HostOs.MacOs -> MacOsBrowserDiscovery()
         HostOs.Windows -> WindowsBrowserDiscovery()
-        HostOs.Linux,
+        HostOs.Linux -> LinuxBrowserDiscovery()
         HostOs.Android,
         HostOs.Other -> EmptyBrowserDiscovery(System.getProperty("os.name").orEmpty())
     }
@@ -40,7 +44,7 @@ object PlatformFactory {
     fun createDefaultBrowserService(ownBundleId: String): DefaultBrowserService = when (currentOs) {
         HostOs.MacOs -> MacOsDefaultBrowserService(ownBundleId = ownBundleId)
         HostOs.Windows -> WindowsDefaultBrowserService()
-        HostOs.Linux,
+        HostOs.Linux -> LinuxDefaultBrowserService()
         HostOs.Android,
         HostOs.Other -> LinuxDefaultBrowserService()
     }
@@ -48,9 +52,7 @@ object PlatformFactory {
     fun createLinkLauncher(): LinkLauncher = when (currentOs) {
         HostOs.MacOs -> MacOsLinkLauncher()
         HostOs.Windows -> WindowsLinkLauncher()
-        // Linux launcher is stage 8 — until then, print so the picker
-        // UI still works end-to-end in dev.
-        HostOs.Linux,
+        HostOs.Linux -> LinuxLinkLauncher()
         HostOs.Android,
         HostOs.Other -> PrintingLinkLauncher()
     }
@@ -58,7 +60,7 @@ object PlatformFactory {
     fun createBrowserMetadataExtractor(): BrowserMetadataExtractor = when (currentOs) {
         HostOs.MacOs -> MacOsBrowserMetadataExtractor()
         HostOs.Windows -> WindowsBrowserMetadataExtractor()
-        HostOs.Linux,
+        HostOs.Linux -> LinuxBrowserMetadataExtractor()
         HostOs.Android,
         HostOs.Other -> UnsupportedManualBrowserExtractor(System.getProperty("os.name").orEmpty())
     }

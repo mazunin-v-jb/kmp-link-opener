@@ -5,11 +5,19 @@ import dev.hackathon.linkopener.app.tray.TrayHost
 import dev.hackathon.linkopener.app.tray.enableMacOsTrayTemplateImages
 import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.platform.PlatformFactory
+import dev.hackathon.linkopener.platform.linux.LinuxHandlerRegistration
 import dev.hackathon.linkopener.platform.windows.WindowsHandlerRegistration
 import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+    // Mirror System.out / System.err to ~/.linkopener/last-run.log. Lets
+    // us collect diagnostic output even when the app is launched by
+    // double-click on Linux Mint (no attached terminal). Has to run
+    // before any println / System.err.println so the very first bytes
+    // already land in the file. See DiagnosticLog's KDoc.
+    DiagnosticLog.installEarly()
+
     // Has to run before the first TrayIcon is constructed so the macOS
     // CImage path picks up the flag — see JDK-8252015. Per-image properties
     // don't survive CTrayIcon's internal BufferedImage redraw; this is the
@@ -43,13 +51,14 @@ fun main(args: Array<String>) {
     }
 
     // Register ourselves as a URL handler on Windows (HKCU writes, no
-    // elevation). Idempotent so running every startup is fine. macOS's
-    // analogue is the Info.plist's CFBundleURLTypes registered at .app
-    // install time; Linux is stage 8.
-    if (PlatformFactory.currentOs == HostOs.Windows) {
-        runBlocking {
-            WindowsHandlerRegistration().register()
-        }
+    // elevation) / Linux (writes ~/.local/share/applications/...). Both
+    // are idempotent so running every startup is fine. macOS's analogue
+    // is the Info.plist's CFBundleURLTypes registered at .app install
+    // time, no runtime work needed.
+    when (PlatformFactory.currentOs) {
+        HostOs.Windows -> runBlocking { WindowsHandlerRegistration().register() }
+        HostOs.Linux -> runBlocking { LinuxHandlerRegistration().register() }
+        else -> Unit
     }
 
     // If we WERE handed a URL on argv (Windows secondary that just
