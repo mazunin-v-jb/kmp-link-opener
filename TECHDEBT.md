@@ -34,16 +34,6 @@ Resolved items are removed (git log preserves history) — keep the list short s
 
 ---
 
-## TD-5 — Windows default-browser detection is a stub
-
-**Where:** `shared/src/jvmMain/kotlin/dev/hackathon/linkopener/platform/windows/WindowsDefaultBrowserService.kt`.
-
-**What:** `isDefaultBrowser()` always returns `false`. There is no real check against the registry (`HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice` etc.). This is fine until stage 7 lands, but flagged so it doesn't get forgotten when Windows support is real.
-
-**Action:** part of stage 7 anyway — leave the TODO in `WindowsDefaultBrowserService.kt` and treat this entry as a backlog cross-reference.
-
----
-
 ## TD-6 — Inter font is not bundled
 
 **Where:** `shared/src/commonMain/kotlin/dev/hackathon/linkopener/ui/theme/LinkOpenerTypography.kt` (TODO comment), context in `ai_stages/045_design_system/plan.md`.
@@ -54,7 +44,7 @@ Resolved items are removed (git log preserves history) — keep the list short s
 
 ---
 
-## TD-8 — Refresh button can show stale default-browser state
+## TD-8 — macOS refresh button can show stale default-browser state
 
 **Where:** `shared/src/jvmMain/kotlin/dev/hackathon/linkopener/platform/macos/MacOsDefaultBrowserService.kt` (`isDefaultBrowser`); the user-facing trigger is the Settings refresh button wired through `SettingsViewModel.refresh()`.
 
@@ -68,6 +58,40 @@ Resolved items are removed (git log preserves history) — keep the list short s
 The user-visible impact is "refresh button doesn't always reflect what System Settings just showed" — annoying but not load-bearing. Other paths (WatchService-driven live banner, picker behaviour, link-opening) all eventually catch up once `lsd` flushes.
 
 **Action:** when this becomes load-bearing (release polish, user complaints), pick one of the two approaches above. Until then the limitation is documented and the existing read path is left as-is. Diagnostic hint for anyone re-investigating: `defaults export com.apple.LaunchServices/com.apple.launchservices.secure - | plutil -convert json -r -o - -` returns the same data as our current path, so don't switch to it expecting magic.
+
+---
+
+## TD-9 — Linux Chromium profile detection not implemented
+
+**Where:** `shared/src/jvmMain/kotlin/dev/hackathon/linkopener/platform/linux/LinuxBrowserDiscovery.kt` (no profile expansion call), `ai_stages/08_linux_support/plan.md` § "Out of scope for stage 8".
+
+**What:** macOS Chromium-family browsers expand into one Browser-per-profile during discovery (`MacOsBrowserDiscovery.expandWithProfiles` reads `~/Library/Application Support/Google/Chrome/Local State` JSON). On Linux every Chromium-family install surfaces as a single row even when the user has multiple profiles. The `LinuxLinkLauncher` already has the `--profile-directory=<id>` argv branch wired and would route correctly the moment we populate `Browser.profile`; what's missing is the scanner.
+
+**Why it's still in the repo:** stage 8 was scoped to "browsers actually work on Linux" and per-profile UI was an explicit follow-up. Single-profile users — the majority — get a fully functional picker today.
+
+**Action:** port `ChromiumProfileScanner` to read Linux paths (`~/.config/google-chrome/`, `~/.config/chromium/`, `~/.config/BraveSoftware/Brave-Browser/`, `~/.config/microsoft-edge/`, `~/.config/vivaldi/`). The `Local State` JSON layout is identical across OSes, so the parser itself ports unchanged — only the `chromiumUserDataPaths` map needs a Linux-flavoured analogue. Probably half a day including tests.
+
+---
+
+## TD-10 — Linux tray icon is a monochrome silhouette, not the brand colour
+
+**Where:** `desktopApp/src/jvmMain/kotlin/dev/hackathon/linkopener/app/tray/LinuxNativeTray.kt` — `Icon(... tint = if (isMenuBarInDarkMode()) Color.White else Color.Black)`.
+
+**What:** Cinnamon / GNOME / KDE panel applets pull StatusNotifierItem icons through a path that flattens any pixmap to a single colour driven by panel theme — passing the multi-colour brand logo as-is renders as an invisible black blob on Cinnamon's dark panel. We tint the rasterised logo white-on-dark / black-on-light to keep the icon legible. Trade-off: loses the brand colour and the silhouette can read as "generic app icon" against a busy panel.
+
+**Why it's still in the repo:** the convention every Linux desktop user is familiar with (Slack / Discord / Signal / VS Code all do the same thing). Reasonable default until someone proves a workaround.
+
+**Action:** investigate whether libayatana-appindicator can be coerced into honouring full-colour pixmaps (some applets have a "full colour icons" toggle; XApp Status Applet on Mint may render the original PNG if we expose it via `IconPath` instead of `IconPixmap`). If yes, plumb a `themed icon-name` path through ComposeNativeTray's `iconContent` slot. If no, accept the silhouette and add a high-contrast monochrome variant of the logo so the tinted result is visually balanced rather than just "the colour logo with its colour stripped".
+
+---
+
+## TD-11 — `DiagnosticLog` has no automated tests
+
+**Where:** `desktopApp/src/jvmMain/kotlin/dev/hackathon/linkopener/app/DiagnosticLog.kt`.
+
+**What:** The `installEarly()` tee is install-once-and-forget glue that mirrors `System.out` / `System.err` to `~/.linkopener/last-run.log` so a double-click launch on Linux Mint still surfaces stderr to the user. It's not unit-tested — installing the tee mutates global state (`System.setOut` / `setErr`) and cleaning up properly inside a test would itself need most of the production tee plumbing. We've manually verified the tee survives `println` / `System.err.println` / Compose-EDT writes (the original implementation that subclassed PrintStream silently dropped most output, which is precisely what tests should catch).
+
+**Action:** add a focused test that (a) creates a temp directory under `tmp.newFolder()`, (b) calls `installEarly()` with the directory injected, (c) writes via `println` / `System.err.println` from a few threads, (d) reads back the file and asserts every line is present. The injection point doesn't exist yet — `installEarly` builds the path internally — so adding a hook there is part of the work. ≈ 1–2 hours.
 
 ---
 
