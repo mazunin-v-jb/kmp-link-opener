@@ -25,6 +25,15 @@ kotlin {
             // so the picker overlays fullscreen apps. Harmless on Win/Linux —
             // the helper is no-op there.
             implementation(libs.jna)
+            // Linux-only tray path — wraps libayatana-appindicator (the
+            // StatusNotifierItem-based protocol modern Cinnamon / GNOME /
+            // KDE actually render in their panels). AWT's XEmbed icons
+            // silently no-op on these DEs, which is the bug we hit. The
+            // native libs ship inside the JAR; only `LinuxNativeTray.kt`
+            // touches this dependency, and it's only called when
+            // `currentOs == HostOs.Linux`, so mac/win builds carry the
+            // unused JAR (~1-2 MB) without hitting any of its code.
+            implementation(libs.composeNativeTray)
         }
 
         jvmTest.dependencies {
@@ -266,6 +275,11 @@ dependencies {
     linuxUberRuntime(libs.kotlinx.serialization.json)
     linuxUberRuntime(libs.multiplatformSettings)
     linuxUberRuntime(libs.jna)
+    // ComposeNativeTray bundles a `libtray.so` for Linux that talks
+    // libayatana-appindicator over D-Bus. Critical for the Linux tray
+    // path; without this the fat-JAR's tray would fall through to the
+    // AWT branch (which we already know doesn't work on Cinnamon).
+    linuxUberRuntime(libs.composeNativeTray)
 }
 
 tasks.register<Jar>("packageLinuxUberJar") {

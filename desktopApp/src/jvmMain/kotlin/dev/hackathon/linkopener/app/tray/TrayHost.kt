@@ -15,6 +15,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import dev.hackathon.linkopener.app.AppContainer
 import dev.hackathon.linkopener.core.model.AppSettings
+import dev.hackathon.linkopener.platform.HostOs
 import dev.hackathon.linkopener.ui.icons.AppIcons
 import dev.hackathon.linkopener.ui.picker.PickerState
 import dev.hackathon.linkopener.ui.settings.SettingsScreen
@@ -103,20 +104,35 @@ private fun ApplicationScope.TrayHostBody(
     val settingsLabel = stringResource(Res.string.tray_menu_settings)
     val quitLabel = stringResource(Res.string.tray_menu_quit)
 
-    NativeTray(
-        iconPainter = appIconPainter,
-        tooltip = appName,
-        hostOs = container.currentOs,
-        onLeftClick = {
-            settingsAnchor = currentScreenCenterPosition(SETTINGS_WIDTH, SETTINGS_HEIGHT)
-        },
-        menuItems = listOf(
-            TrayMenuItem(settingsLabel) {
-                settingsAnchor = currentScreenCenterPosition(SETTINGS_WIDTH, SETTINGS_HEIGHT)
-            },
-            TrayMenuItem(quitLabel, onExit),
-        ),
+    val onTrayLeftClick: () -> Unit = {
+        settingsAnchor = currentScreenCenterPosition(SETTINGS_WIDTH, SETTINGS_HEIGHT)
+    }
+    val trayMenuItems = listOf(
+        TrayMenuItem(settingsLabel, onTrayLeftClick),
+        TrayMenuItem(quitLabel, onExit),
     )
+    // AWT's SystemTray works perfectly on macOS / Windows but XEmbed is
+    // silently ignored by Cinnamon 5.x / modern GNOME / KDE 6 panels —
+    // see LinuxNativeTray's KDoc for the gory details. Linux gets the
+    // libayatana-appindicator path; everyone else keeps the AWT one
+    // (which gives us the macOS template-image autotint + the
+    // left/right click split we want there).
+    if (container.currentOs == HostOs.Linux) {
+        LinuxNativeTray(
+            iconPainter = appIconPainter,
+            tooltip = appName,
+            onLeftClick = onTrayLeftClick,
+            menuItems = trayMenuItems,
+        )
+    } else {
+        NativeTray(
+            iconPainter = appIconPainter,
+            tooltip = appName,
+            hostOs = container.currentOs,
+            onLeftClick = onTrayLeftClick,
+            menuItems = trayMenuItems,
+        )
+    }
 
     val currentPickerState = pickerState
     if (currentPickerState is PickerState.Showing) {
